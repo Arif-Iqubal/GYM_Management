@@ -1,6 +1,7 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import React from 'react'
 import { router } from "expo-router";
+import { moderateScale } from 'react-native-size-matters';
 
 
 const onAgree = () => {
@@ -33,8 +34,8 @@ const styles = StyleSheet.create({
      buttonbody: {
     // flex: 1,
     // backgroundColor: "green",
-    width : "250",
-    height : "50",
+    width : moderateScale(200),
+    height : moderateScale(30),
     justifyContent : 'center',
     borderRadius : 20,
     borderColor : 'black',
