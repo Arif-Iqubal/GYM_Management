@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, TextInput, StyleSheet, TouchableOpacity } from 'react-native'
+import { View, Text, ScrollView, ToastAndroid, TextInput, StyleSheet, TouchableOpacity, Button, Image, ImageBackground, Modal } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Ionicons from '@expo/vector-icons/Ionicons';
 import colors from "@/assets/colors";
@@ -6,11 +6,281 @@ import { moderateScale } from 'react-native-size-matters';
 import { router } from 'expo-router';
 import Entypo from '@expo/vector-icons/Entypo';
 
+
+import FontAwesome from '@expo/vector-icons/FontAwesome';
+import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
+import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
+import AntDesign from '@expo/vector-icons/AntDesign';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import Fontisto from '@expo/vector-icons/Fontisto';
+import SimpleLineIcons from '@expo/vector-icons/SimpleLineIcons';
+
+import * as ImagePicker from 'expo-image-picker';
+import placeholder from '../../assets/images/Avatar/man3.png'
+import React, { useState } from 'react';
+
+import { Picker } from '@react-native-picker/picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { db } from '../../config/firebaseconfig';
+import { collection, addDoc } from 'firebase/firestore';
+import uuid from 'react-native-uuid';
+
 const onAgree = () => {
   router.push("/home");
 };
 
+
 const addmember = () => {
+
+
+
+
+   const [image, setImage] = useState();
+  const [modelvisible, setModalVisible] = useState();
+  const [user, setUser] = useState(null);
+  const [userId, setUserId] = useState(null);
+
+  const [form, setForm] = useState({
+    name: '',
+    mobile: '',
+    gender: 'Male',
+    trainingType: '',
+    email: '',
+    dob: new Date(),
+    gymPlan: '1 Month',
+    admissionFee: '',
+    joiningDate: new Date(),
+    paidAmount: '',
+    paymentMethod: 'Cash',
+    dues: '',
+    comments: '',
+    address: '',
+  });
+
+  const [showDOBPicker, setShowDOBPicker] = useState(false);
+  const [showJoinPicker, setShowJoinPicker] = useState(false);
+
+  const handleChange = (name, value) => {
+    setForm({ ...form, [name]: value });
+  };
+
+  const handleSubmit = async () => {
+    const memberId = uuid.v4().slice(0, 8); // short unique ID
+
+    try {
+      await addDoc(collection(db, 'members'), {
+        ...form,
+        memberId,
+        dob: form.dob.toISOString(),
+        joiningDate: form.joiningDate.toISOString(),
+        createdAt: new Date().toISOString(),
+      });
+
+      ToastAndroid.show('Member added successfully!', ToastAndroid.LONG);
+      setForm({
+        name: '',
+        mobile: '',
+        gender: 'Male',
+        trainingType: '',
+        email: '',
+        dob: new Date(),
+        gymPlan: '1 Month',
+        admissionFee: '',
+        joiningDate: new Date(),
+        paidAmount: '',
+        paymentMethod: 'Cash',
+        dues: '',
+        comments: '',
+        address: '',
+      });
+
+      router.push("/home");
+    } catch (error) {
+      console.error('Error adding member:', error);
+      ToastAndroid.show('Error adding member', ToastAndroid.LONG);
+    }
+  };
+
+
+
+const uploadImage = async (mode) => {
+    try {
+      let result = {}; 
+      if (mode === 'gallery') {
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+        result = await ImagePicker.launchImageLibraryAsync({
+          // mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 1,
+        });
+        if (!result.canceled) {
+          //
+          await saveImage(result.assets[0].uri);
+        }
+      }
+      else {
+        await ImagePicker.requestCameraPermissionsAsync();
+         result = await ImagePicker.
+          launchCameraAsync({
+            cameraType: ImagePicker.CameraType.front,
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 1,
+
+
+          });
+        if (!result.canceled) {
+          //
+          await saveImage(result.assets[0].uri);
+        }
+      }
+    } catch (error) {
+      alert("Error uploading image : " + error.message);
+      setOpenModal(false);
+    }
+
+  };
+  const saveImage = async (image) => {
+    try {
+      console.log(image)
+      setImage(image);
+      setOpenModal(false);
+    } catch (error) {
+      throw error;
+    }
+  };
+
+
+  // Remove Image
+   const removeImage = async () =>{
+    try {
+      setImage(null);
+      setOpenModal(false);
+    } catch ({message}) {
+      alert(message);
+      setOpenModal(false);
+      
+    }
+   }
+
+
+
+
+
+
+   const [openModal, setOpenModal] = useState(false);
+  const transparent = 'rgba(0,0,0,0.2)';
+
+  function renderModel() {
+    return (
+      <Modal visible={openModal} animationType="fade" transparent={true}>
+        <View style={{
+          // flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: transparent,
+          marginTop : 40,
+          paddingBottom : 40,
+          height : '90%'
+        }}>
+          <View style={{
+            // flex : 1,
+            justifyContent: 'space-evenly',
+            alignItems: 'center',
+            height: moderateScale(150),
+            width: moderateScale(300),
+            backgroundColor: colors.lblack,
+            borderRadius: 20,
+          }} >
+            <View
+              style={{
+                // backgroundColor: 'green',
+                width: "100%",
+                height: moderateScale(80),
+                flexDirection: 'row',
+                justifyContent: 'space-evenly',
+                alignItems: 'center',
+              }}
+            >
+              <TouchableOpacity activeOpacity={0.5} onPress={() => uploadImage()}
+                style={{
+                  backgroundColor: colors.twhite,
+                  width: moderateScale(60),
+                  height: moderateScale(60),
+                  // flexDirection: 'row',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  borderRadius: 15,
+                }}
+              >
+                <SimpleLineIcons name="camera" size={30} color="black" />
+                <Text
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 600,
+                  }}
+                >Camera</Text>
+              </TouchableOpacity>
+              <TouchableOpacity activeOpacity={0.5} onPress={() => uploadImage('gallery')}
+                style={{
+                  backgroundColor: colors.twhite,
+                  width: moderateScale(60),
+                  height: moderateScale(60),
+                  // flexDirection: 'row',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  borderRadius: 15,
+                }}
+              >
+                <AntDesign name="picture" size={30} color="black" />
+                <Text
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 600,
+                  }}
+                >Gallery</Text>
+              </TouchableOpacity>
+              <TouchableOpacity activeOpacity={0.5} onPress={() => removeImage()}
+                style={{
+                  backgroundColor: colors.twhite,
+                  width: moderateScale(60),
+                  height: moderateScale(60),
+                  // flexDirection: 'row',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  borderRadius: 15,
+                }}
+              >
+                <AntDesign name="delete" size={30} color="black" />
+                <Text
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 600,
+                  }}
+                >Remove</Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity activeOpacity={0.5} onPress={() => setOpenModal(false)}>
+              <Text
+              style={{
+                width: moderateScale(80),
+                // height: moderateScale(30),
+                // backgroundColor : 'blue',
+                textAlign: 'center',
+                fontSize: moderateScale(15),
+                color: 'grey'
+                // alignContent : 'center'
+              }}
+            >Cancel</Text></TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    )
+  }
+
+
+
   return (
     <SafeAreaView style={styles.mainbody}>
       <View style={styles.headerbox}>
@@ -18,9 +288,9 @@ const addmember = () => {
           <TouchableOpacity onPress={onAgree} activeOpacity={0.8}><Ionicons name="chevron-back-sharp" size={26} color="white" /></TouchableOpacity>
           <Text style={styles.navtext}>Add Members</Text>
         </View>
-        <TouchableOpacity onPress={onAgree} activeOpacity={0.8} style={styles.savebox}><Text style={styles.savetext}>Save</Text></TouchableOpacity>
+        <TouchableOpacity onPress={handleSubmit} activeOpacity={0.8} style={styles.savebox}><Text style={styles.savetext}>Save</Text></TouchableOpacity>
       </View>
-      <ScrollView >
+      {/* <ScrollView >
         <View style={styles.Scrollbody}>
           <View style={styles.imgboxout}>
             <View style={styles.imgboxin}><Ionicons name="person-sharp" size={150} color="grey" /></View>
@@ -77,7 +347,98 @@ const addmember = () => {
             </View>
           </View>
         </View>
+      </ScrollView> */}
+
+
+
+
+
+
+
+
+      <ScrollView contentContainerStyle={styles.container}>
+
+         <View style={styles.profileimgcontmain}>
+        <View style={styles.bg}>
+          <View style={styles.profileimgcont}>
+            <View style={styles.profileimgin} >
+              <Image style={styles.profileimg} resizeMode="contain" source={image ? { uri: image } : placeholder} />
+            </View>
+
+            <TouchableOpacity onPress={() => setOpenModal(true)} activeOpacity={0.5} style={styles.profileimgcam}><FontAwesome name="camera" size={18} color={colors.cwhite} /></ TouchableOpacity>
+          </View>
+        </View>
+      </View>
+
+
+        {/* <Text style={styles.title}>Add Gym Member</Text> */}
+ <Text style={styles.label}>Personal Detail</Text>
+        <TextInput placeholder="Name"  placeholderTextColor={colors.pholder} value={form.name} onChangeText={text => handleChange('name', text)} style={styles.input} />
+        <TextInput placeholder="Mobile Number" placeholderTextColor={colors.pholder} keyboardType="phone-pad" value={form.mobile} onChangeText={text => handleChange('mobile', text)} style={styles.input} />
+        <TextInput placeholder="Email" placeholderTextColor={colors.pholder} value={form.email} onChangeText={text => handleChange('email', text)} style={styles.input} />
+        <TextInput placeholder="Training Type" placeholderTextColor={colors.pholder} value={form.trainingType} onChangeText={text => handleChange('trainingType', text)} style={styles.input} />
+
+        <Text style={styles.label}>Gender</Text>
+        <Picker selectedValue={form.gender} onValueChange={value => handleChange('gender', value)} style={styles.picker}>
+          <Picker.Item label="Male" value="Male" />
+          <Picker.Item label="Female" value="Female" />
+          <Picker.Item label="Other" value="Other" />
+        </Picker>
+
+        <Text style={styles.label}>Date of Birth</Text>
+        <Button style={styles.pickstyle} title={form.dob.toDateString()} onPress={() => setShowDOBPicker(true)} />
+        {showDOBPicker && (
+          <DateTimePicker
+            value={form.dob}
+            mode="date"
+            display="default"
+            onChange={(_, date) => {
+              setShowDOBPicker(false);
+              if (date) handleChange('dob', date);
+            }}
+          />
+        )}
+
+        <Text style={styles.label}>Select Gym Plan</Text>
+        <Picker selectedValue={form.gymPlan} onValueChange={value => handleChange('gymPlan', value)} style={styles.picker}>
+          <Picker.Item label="1 Month" value="1000" />
+          <Picker.Item label="3 Months" value="2000" />
+          <Picker.Item label="6 Months" value="3000" />
+        </Picker>
+
+        <TextInput placeholder="Admission Fees" placeholderTextColor={colors.pholder} keyboardType="numeric" value={form.admissionFee} onChangeText={text => handleChange('admissionFee', text)} style={styles.input} />
+        <TextInput placeholder="Paid Amount" placeholderTextColor={colors.pholder} keyboardType="numeric" value={form.paidAmount} onChangeText={text => handleChange('paidAmount', text)} style={styles.input} />
+        <TextInput placeholder="Dues" placeholderTextColor={colors.pholder} keyboardType="numeric" value={form.dues} onChangeText={text => handleChange('dues', text)} style={styles.input} />
+
+        <Text style={styles.label}>Select Joining Date</Text>
+        <Button backgroundColor = {colors.gwhite} color ={colors.lgrey} style={styles.pickstyle} title={form.joiningDate.toDateString()} onPress={() => setShowJoinPicker(true)} />
+        {showJoinPicker && (
+          <DateTimePicker
+            value={form.joiningDate}
+            mode="date"
+            display="default"
+            onChange={(_, date) => {
+              setShowJoinPicker(false);
+              if (date) handleChange('joiningDate', date);
+            }}
+          />
+        )}
+
+        <Text style={styles.label}>Payment Method</Text>
+        <Picker selectedValue={form.paymentMethod} onValueChange={value => handleChange('paymentMethod', value)} style={styles.picker}>
+          <Picker.Item label="Cash" value="Cash" />
+          <Picker.Item label="UPI" value="UPI" />
+          <Picker.Item label="Card" value="Card" />
+          <Picker.Item label="Other" value="Other" />
+        </Picker>
+
+        <TextInput placeholder="Address" placeholderTextColor={colors.pholder} value={form.address} onChangeText={text => handleChange('address', text)} style={styles.input} />
+        <TextInput placeholder="Comments"  placeholderTextColor={colors.pholder}value={form.comments} onChangeText={text => handleChange('comments', text)} style={styles.input} />
+
+        {/* <TouchableOpacity title="Submit" onPress={handleSubmit} color="#6200ee" /> */}
+        <View style={styles.filler}></View>
       </ScrollView>
+        {renderModel()}
     </SafeAreaView>
   )
 }
@@ -90,7 +451,7 @@ const styles = StyleSheet.create({
     // justifyContent : 'center',
     backgroundColor: colors.dblack,
     alignItems: 'center',
-    gap: 20,
+    // gap: 20,
   },
   headerbox: {
     // flex : 1,
@@ -156,13 +517,13 @@ const styles = StyleSheet.create({
 
   },
   inputbodym: {
-    // backgroundColor: 'yellow',
-    width: moderateScale(300),
+    backgroundColor: 'yellow',
+    // width: moderateScale(300),
     // height : moderateScale(45),
     // borderRadius : moderateScale(20),
     justifyContent: 'center',
     alignItems: 'center',
-    gap : moderateScale(8),
+    gap: moderateScale(8),
   },
   inputbody: {
     backgroundColor: colors.wblack,
@@ -176,5 +537,122 @@ const styles = StyleSheet.create({
   },
   inputval: {
     width: '95%',
+  },
+  filler: {
+    width: '100%',
+    height : moderateScale(80),
+  },
+
+
+
+
+  container: {
+    // flex : 1,
+    width: moderateScale(320),
+    // height: '100%',
+    // padding: 16,
+    color : colors.lgrey,
+    backgroundColor: colors.dblack,
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    color: colors.gwhite,
+    textAlign: 'center',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    padding: 10,
+    borderRadius: 15,
+    marginBottom: 12,
+    color : colors.gwhite,
+    backgroundColor: colors.wblack,
+  },
+  label: {
+    fontWeight: 'bold',
+    marginTop: 12,
+    color : colors.gwhite,
+    // width : moderateScale(100),
+  },
+  picker: {
+    backgroundColor: colors.wblack,
+    marginBottom: 12,
+    color : colors.pholder,
+    borderRadius : 17,
+  },
+  pickstyle: {
+    backgroundColor: colors.wblack,
+    marginBottom: 12,
+    color : colors.pholder,
+    borderRadius : 17,
+  },
+
+
+
+
+  profileimgcontmain: {
+    width: "100%",
+    height: moderateScale(150),
+    justifyContent: 'center',
+    alignItems: "center",
+
+    // backgroundColor: "red",
+
+
+    // borderRadius : moderateScale(50),
+
+  },
+  profileimgcont: {
+    width: moderateScale(120),
+    height: moderateScale(120),
+    borderRadius: moderateScale(60),
+    backgroundColor: colors.pgreenl,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+
+
+
+    // zIndex : 2,
+
+
+
+  },
+  profileimg: {
+    width: moderateScale(120),
+    height: moderateScale(120),
+    backgroundColor: colors.pgreenl,
+    borderRadius: moderateScale(60),
+    zIndex: 2,
+    borderWidth: 3,
+    borderColor: colors.cwhite,
+
+
+
+  },
+  profileimgcam: {
+    width: moderateScale(30),
+    height: moderateScale(30),
+    borderRadius: moderateScale(10),
+    position: 'absolute',
+    // alignContent : "baseline",
+    justifyContent: 'center',
+    alignItems: "center",
+    zIndex: 2,
+    backgroundColor: colors.twhite,
+    borderWidth: 2,
+    borderColor: colors.cwhite,
+    // marginLeft: 100,
+    // marginLeft : 10,
+
+
+  },
+  bg: {
+    // width: '100%',
+    // height: '100%',
+    justifyContent: 'center',
+    alignItems: "center",
+    // borderBottomLeftRadius : moderateScale(50),
   },
 })
