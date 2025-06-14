@@ -5,7 +5,7 @@ import colors from "@/assets/colors";
 import { moderateScale } from 'react-native-size-matters';
 import { router } from 'expo-router';
 import Entypo from '@expo/vector-icons/Entypo';
-
+import { uploadFileToCloudinary } from '../../services/imageService'
 
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
@@ -17,12 +17,12 @@ import SimpleLineIcons from '@expo/vector-icons/SimpleLineIcons';
 
 import * as ImagePicker from 'expo-image-picker';
 import placeholder from '../../assets/images/Avatar/man3.png'
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { db } from '../../config/firebaseconfig';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot } from 'firebase/firestore';
 import uuid from 'react-native-uuid';
 
 const onAgree = () => {
@@ -35,7 +35,7 @@ const addmember = () => {
 
 
 
-   const [image, setImage] = useState();
+  const [image, setImage] = useState(null);
   const [modelvisible, setModalVisible] = useState();
   const [user, setUser] = useState(null);
   const [userId, setUserId] = useState(null);
@@ -59,6 +59,11 @@ const addmember = () => {
 
   const [showDOBPicker, setShowDOBPicker] = useState(false);
   const [showJoinPicker, setShowJoinPicker] = useState(false);
+  const [adminUID, setAdminUID] = useState("ecNCqm8PgxOEgG9S7puVpm2hVZn2");
+
+
+  //  const [image, setImage] = useState(null);
+
 
   const handleChange = (name, value) => {
     setForm({ ...form, [name]: value });
@@ -66,17 +71,37 @@ const addmember = () => {
 
   const handleSubmit = async () => {
     const memberId = uuid.v4().slice(0, 8); // short unique ID
+    const uid = adminUID || auth.currentUser?.uid;
+    console.log(uid);
 
     try {
-      await addDoc(collection(db, 'members'), {
+      // const imageUrl = await uploadFileToCloudinary(image);
+      const imageUrl = await uploadFileToCloudinary(image, "member_images");
+      // console.log(imageUrl);
+      const memberRef = await addDoc(collection(db, 'admin', uid, 'members'), {
         ...form,
         memberId,
+        imageUrl,
         dob: form.dob.toISOString(),
         joiningDate: form.joiningDate.toISOString(),
         createdAt: new Date().toISOString(),
       });
 
-      ToastAndroid.show('Member added successfully!', ToastAndroid.LONG);
+
+
+      // Step 2: Add initial transaction inside the member document
+      await addDoc(collection(db, 'admin', uid, 'members', memberRef.id, 'transactions'), {
+        memberName: form.name,
+        paymentDate: new Date().toISOString(),
+        amountpaid: parseFloat(form.paidAmount) || 0,
+        paymentMethod: form.paymentMethod,
+        dues: form.dues,
+        plandetail: form.gymPlan,
+      });
+
+      ToastAndroid.show('Member and transaction added successfully!', ToastAndroid.LONG);
+
+      // ToastAndroid.show('Member added successfully!', ToastAndroid.LONG);
       setForm({
         name: '',
         mobile: '',
@@ -92,8 +117,9 @@ const addmember = () => {
         dues: '',
         comments: '',
         address: '',
-      });
 
+      });
+      setImage(null);
       router.push("/home");
     } catch (error) {
       console.error('Error adding member:', error);
@@ -103,9 +129,29 @@ const addmember = () => {
 
 
 
-const uploadImage = async (mode) => {
+
+
+  const [plans, setPlans] = useState([]);
+  const [selectedPlan, setSelectedPlan] = useState('');
+
+  useEffect(() => {
+    const adminId = 'ecNCqm8PgxOEgG9S7puVpm2hVZn2';
+    // let q = collection(db, 'admin', adminId, 'members');
+    const unsub = onSnapshot(collection(db, 'admin', adminId, 'plans'), (snapshot) => {
+      const list = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setPlans(list);
+    });
+
+    return () => unsub();
+  }, []);
+
+
+  const uploadImage = async (mode) => {
     try {
-      let result = {}; 
+      let result = {};
       if (mode === 'gallery') {
         await ImagePicker.requestMediaLibraryPermissionsAsync();
         result = await ImagePicker.launchImageLibraryAsync({
@@ -121,7 +167,7 @@ const uploadImage = async (mode) => {
       }
       else {
         await ImagePicker.requestCameraPermissionsAsync();
-         result = await ImagePicker.
+        result = await ImagePicker.
           launchCameraAsync({
             cameraType: ImagePicker.CameraType.front,
             allowsEditing: true,
@@ -144,7 +190,7 @@ const uploadImage = async (mode) => {
   const saveImage = async (image) => {
     try {
       console.log(image)
-      setImage(image);
+      setImage({ uri: image });
       setOpenModal(false);
     } catch (error) {
       throw error;
@@ -153,23 +199,31 @@ const uploadImage = async (mode) => {
 
 
   // Remove Image
-   const removeImage = async () =>{
+  const removeImage = async () => {
     try {
       setImage(null);
       setOpenModal(false);
-    } catch ({message}) {
+    } catch ({ message }) {
       alert(message);
       setOpenModal(false);
-      
+
     }
-   }
+  }
 
 
 
+  useEffect(() => {
+    const planPrice = parseFloat(selectedPlan?.price || 0);
+    const admission = parseFloat(form.admissionFee || 0);
+    const paid = parseFloat(form.paidAmount || 0);
+    const dues = planPrice + admission - paid;
+
+    handleChange('dues', dues > 0 ? dues.toFixed(2) : '0');
+  }, [selectedPlan, form.admissionFee, form.paidAmount]);
 
 
 
-   const [openModal, setOpenModal] = useState(false);
+  const [openModal, setOpenModal] = useState(false);
   const transparent = 'rgba(0,0,0,0.2)';
 
   function renderModel() {
@@ -180,9 +234,9 @@ const uploadImage = async (mode) => {
           justifyContent: 'center',
           alignItems: 'center',
           backgroundColor: transparent,
-          marginTop : 40,
-          paddingBottom : 40,
-          height : '90%'
+          marginTop: 40,
+          paddingBottom: 40,
+          height: '90%'
         }}>
           <View style={{
             // flex : 1,
@@ -263,16 +317,16 @@ const uploadImage = async (mode) => {
             </View>
             <TouchableOpacity activeOpacity={0.5} onPress={() => setOpenModal(false)}>
               <Text
-              style={{
-                width: moderateScale(80),
-                // height: moderateScale(30),
-                // backgroundColor : 'blue',
-                textAlign: 'center',
-                fontSize: moderateScale(15),
-                color: 'grey'
-                // alignContent : 'center'
-              }}
-            >Cancel</Text></TouchableOpacity>
+                style={{
+                  width: moderateScale(80),
+                  // height: moderateScale(30),
+                  // backgroundColor : 'blue',
+                  textAlign: 'center',
+                  fontSize: moderateScale(15),
+                  color: 'grey'
+                  // alignContent : 'center'
+                }}
+              >Cancel</Text></TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -358,22 +412,34 @@ const uploadImage = async (mode) => {
 
       <ScrollView contentContainerStyle={styles.container}>
 
-         <View style={styles.profileimgcontmain}>
-        <View style={styles.bg}>
-          <View style={styles.profileimgcont}>
-            <View style={styles.profileimgin} >
-              <Image style={styles.profileimg} resizeMode="contain" source={image ? { uri: image } : placeholder} />
-            </View>
+        <View style={styles.profileimgcontmain}>
+          <View style={styles.bg}>
+            <View style={styles.profileimgcont}>
+              <View style={styles.profileimgin} >
+                {/* <Image style={styles.profileimg} resizeMode="contain" source={image ? { uri: image } : placeholder} />
+                 */}
+                <Image
+                resizeMode="contain"
+                  source={
+                    image && typeof image === 'object' && image.uri
+                      ? { uri: image.uri }
+                      : typeof image === 'string'
+                        ? { uri: image }
+                        : placeholder
+                  }
+                  style={styles.profileimg}
+                />
+              </View>
 
-            <TouchableOpacity onPress={() => setOpenModal(true)} activeOpacity={0.5} style={styles.profileimgcam}><FontAwesome name="camera" size={18} color={colors.cwhite} /></ TouchableOpacity>
+              <TouchableOpacity onPress={() => setOpenModal(true)} activeOpacity={0.5} style={styles.profileimgcam}><FontAwesome name="camera" size={18} color={colors.cwhite} /></ TouchableOpacity>
+            </View>
           </View>
         </View>
-      </View>
 
 
         {/* <Text style={styles.title}>Add Gym Member</Text> */}
- <Text style={styles.label}>Personal Detail</Text>
-        <TextInput placeholder="Name"  placeholderTextColor={colors.pholder} value={form.name} onChangeText={text => handleChange('name', text)} style={styles.input} />
+        <Text style={styles.label}>Personal Detail</Text>
+        <TextInput placeholder="Name" placeholderTextColor={colors.pholder} value={form.name} onChangeText={text => handleChange('name', text)} style={styles.input} />
         <TextInput placeholder="Mobile Number" placeholderTextColor={colors.pholder} keyboardType="phone-pad" value={form.mobile} onChangeText={text => handleChange('mobile', text)} style={styles.input} />
         <TextInput placeholder="Email" placeholderTextColor={colors.pholder} value={form.email} onChangeText={text => handleChange('email', text)} style={styles.input} />
         <TextInput placeholder="Training Type" placeholderTextColor={colors.pholder} value={form.trainingType} onChangeText={text => handleChange('trainingType', text)} style={styles.input} />
@@ -400,18 +466,67 @@ const uploadImage = async (mode) => {
         )}
 
         <Text style={styles.label}>Select Gym Plan</Text>
-        <Picker selectedValue={form.gymPlan} onValueChange={value => handleChange('gymPlan', value)} style={styles.picker}>
+
+        {/* <Picker selectedValue={form.gymPlan} onValueChange={value => handleChange('gymPlan', value)} style={styles.picker}>
           <Picker.Item label="1 Month" value="1000" />
           <Picker.Item label="3 Months" value="2000" />
           <Picker.Item label="6 Months" value="3000" />
+        </Picker> */}
+
+
+        {/* <Picker
+        selectedValue={selectedPlan}
+        style={styles.picker}
+        onValueChange={(itemValue) => setSelectedPlan(itemValue)}
+      >
+        <Picker.Item label="-- Select Plan --" value="" />
+        {plans.map((plan) => (
+          <Picker.Item
+            key={plan.id}
+            label={`${plan.name} - ₹${plan.price}`}
+            value={plan.id}
+          />
+
+           ))}
+      </Picker> */}
+
+
+        <Picker
+          selectedValue={selectedPlan?.id || ''}
+          style={styles.picker}
+          onValueChange={(itemValue) => {
+            const plan = plans.find(p => p.id === itemValue);
+            setSelectedPlan(plan);
+            handleChange('gymPlan', plan?.name || ''); // Save plan name in form
+          }}
+        >
+          <Picker.Item label="-- Select Plan --" value="" />
+          {plans.map((plan) => (
+            <Picker.Item
+              key={plan.id}
+              label={`${plan.name} - ₹${plan.price}`}
+              value={plan.id}
+            />
+          ))}
         </Picker>
+
 
         <TextInput placeholder="Admission Fees" placeholderTextColor={colors.pholder} keyboardType="numeric" value={form.admissionFee} onChangeText={text => handleChange('admissionFee', text)} style={styles.input} />
         <TextInput placeholder="Paid Amount" placeholderTextColor={colors.pholder} keyboardType="numeric" value={form.paidAmount} onChangeText={text => handleChange('paidAmount', text)} style={styles.input} />
-        <TextInput placeholder="Dues" placeholderTextColor={colors.pholder} keyboardType="numeric" value={form.dues} onChangeText={text => handleChange('dues', text)} style={styles.input} />
+        {/* <TextInput placeholder="Dues" placeholderTextColor={colors.pholder} keyboardType="numeric" value={form.dues} onChangeText={text => handleChange('dues', text)} style={styles.input} /> */}
+        <Text style={styles.label}>Dues Amount</Text>
+        <TextInput
+          placeholder="Dues"
+          placeholderTextColor={colors.pholder}
+          keyboardType="numeric"
+          value={form.dues}
+          editable={false}
+          style={[styles.input]}
+        />
+
 
         <Text style={styles.label}>Select Joining Date</Text>
-        <Button backgroundColor = {colors.gwhite} color ={colors.lgrey} style={styles.pickstyle} title={form.joiningDate.toDateString()} onPress={() => setShowJoinPicker(true)} />
+        <Button backgroundColor={colors.gwhite} color={colors.lgrey} style={styles.pickstyle} title={form.joiningDate.toDateString()} onPress={() => setShowJoinPicker(true)} />
         {showJoinPicker && (
           <DateTimePicker
             value={form.joiningDate}
@@ -433,12 +548,12 @@ const uploadImage = async (mode) => {
         </Picker>
 
         <TextInput placeholder="Address" placeholderTextColor={colors.pholder} value={form.address} onChangeText={text => handleChange('address', text)} style={styles.input} />
-        <TextInput placeholder="Comments"  placeholderTextColor={colors.pholder}value={form.comments} onChangeText={text => handleChange('comments', text)} style={styles.input} />
+        <TextInput placeholder="Comments" placeholderTextColor={colors.pholder} value={form.comments} onChangeText={text => handleChange('comments', text)} style={styles.input} />
 
         {/* <TouchableOpacity title="Submit" onPress={handleSubmit} color="#6200ee" /> */}
         <View style={styles.filler}></View>
       </ScrollView>
-        {renderModel()}
+      {renderModel()}
     </SafeAreaView>
   )
 }
@@ -540,7 +655,7 @@ const styles = StyleSheet.create({
   },
   filler: {
     width: '100%',
-    height : moderateScale(80),
+    height: moderateScale(80),
   },
 
 
@@ -551,7 +666,7 @@ const styles = StyleSheet.create({
     width: moderateScale(320),
     // height: '100%',
     // padding: 16,
-    color : colors.lgrey,
+    color: colors.lgrey,
     backgroundColor: colors.dblack,
   },
   title: {
@@ -567,26 +682,26 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 15,
     marginBottom: 12,
-    color : colors.gwhite,
+    color: colors.gwhite,
     backgroundColor: colors.wblack,
   },
   label: {
     fontWeight: 'bold',
     marginTop: 12,
-    color : colors.gwhite,
+    color: colors.gwhite,
     // width : moderateScale(100),
   },
   picker: {
     backgroundColor: colors.wblack,
     marginBottom: 12,
-    color : colors.pholder,
-    borderRadius : 17,
+    color: colors.pholder,
+    borderRadius: 17,
   },
   pickstyle: {
     backgroundColor: colors.wblack,
     marginBottom: 12,
-    color : colors.pholder,
-    borderRadius : 17,
+    color: colors.pholder,
+    borderRadius: 17,
   },
 
 

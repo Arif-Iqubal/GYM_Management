@@ -12,6 +12,7 @@
 // export default home
 
 import colors from "@/assets/colors";
+import placeholder from '../../assets/images/Avatar/man3.png'
 
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, StyleSheet, Image, TouchableOpacity, ScrollView } from 'react-native';
@@ -73,196 +74,196 @@ const transactions= [
   {
     name: "John Doe",
     time: "10:00 AM",
-    img: "https://example.com/photo.jpg",
+    img: "",
     amount: 500,
     type: "income"
   },
   {
     name: "Jane Smith",
     time: "2:30 PM",
-    img: "https://example.com/photo2.jpg",
+    img: "",
     amount: 300,
     type: "dues"
   },
   {
     name: "John Doe",
     time: "10:00 AM",
-    img: "https://example.com/photo.jpg",
+    img: "",
     amount: 500,
     type: "income"
   },
   {
     name: "Jane Smith",
     time: "2:30 PM",
-    img: "https://example.com/photo2.jpg",
+    img: "",
     amount: 300,
     type: "dues"
   },
   {
     name: "John Doe",
     time: "10:00 AM",
-    img: "https://example.com/photo.jpg",
+    img: "",
     amount: 500,
     type: "income"
   },
   {
     name: "Jane Smith",
     time: "2:30 PM",
-    img: "https://example.com/photo2.jpg",
+    img: "",
     amount: 300,
     type: "dues"
   },
   {
     name: "John Doe",
     time: "10:00 AM",
-    img: "https://example.com/photo.jpg",
+    img: "",
     amount: 500,
     type: "income"
   },
   {
     name: "Jane Smith",
     time: "2:30 PM",
-    img: "https://example.com/photo2.jpg",
+    img: "",
     amount: 300,
     type: "dues"
   },
   {
     name: "John Doe",
     time: "10:00 AM",
-    img: "https://example.com/photo.jpg",
+    img: "",
     amount: 500,
     type: "income"
   },
   {
     name: "Jane Smith",
     time: "2:30 PM",
-    img: "https://example.com/photo2.jpg",
+    img: "",
     amount: 300,
     type: "dues"
   },
   {
     name: "John Doe",
     time: "10:00 AM",
-    img: "https://example.com/photo.jpg",
+    img: "",
     amount: 500,
     type: "income"
   },
   {
     name: "Jane Smith",
     time: "2:30 PM",
-    img: "https://example.com/photo2.jpg",
+    img: "",
     amount: 300,
     type: "dues"
   },
   {
     name: "John Doe",
     time: "10:00 AM",
-    img: "https://example.com/photo.jpg",
+    img: "",
     amount: 500,
     type: "income"
   },
   {
     name: "Jane Smith",
     time: "2:30 PM",
-    img: "https://example.com/photo2.jpg",
+    img: "",
     amount: 300,
     type: "dues"
   },
   {
     name: "John Doe",
     time: "10:00 AM",
-    img: "https://example.com/photo.jpg",
+    img: "",
     amount: 500,
     type: "income"
   },
   {
     name: "Jane Smith",
     time: "2:30 PM",
-    img: "https://example.com/photo2.jpg",
+    img: "",
     amount: 300,
     type: "dues"
   },
   {
     name: "John Doe",
     time: "10:00 AM",
-    img: "https://example.com/photo.jpg",
+    img: "",
     amount: 500,
     type: "income"
   },
   {
     name: "Jane Smith",
     time: "2:30 PM",
-    img: "https://example.com/photo2.jpg",
+    img: "",
     amount: 300,
     type: "dues"
   },
   {
     name: "John Doe",
     time: "10:00 AM",
-    img: "https://example.com/photo.jpg",
+    img: "",
     amount: 500,
     type: "income"
   },
   {
     name: "Jane Smith",
     time: "2:30 PM",
-    img: "https://example.com/photo2.jpg",
+    img: "",
     amount: 300,
     type: "dues"
   },
   {
     name: "John Doe",
     time: "10:00 AM",
-    img: "https://example.com/photo.jpg",
+    img: "",
     amount: 500,
     type: "income"
   },
   {
     name: "Jane Smith",
     time: "2:30 PM",
-    img: "https://example.com/photo2.jpg",
+    img: "",
     amount: 300,
     type: "dues"
   },
   {
     name: "John Doe",
     time: "10:00 AM",
-    img: "https://example.com/photo.jpg",
+    img: "",
     amount: 500,
     type: "income"
   },
   {
     name: "Jane Smith",
     time: "2:30 PM",
-    img: "https://example.com/photo2.jpg",
+    img: "",
     amount: 300,
     type: "dues"
   },
   {
     name: "John Doe",
     time: "10:00 AM",
-    img: "https://example.com/photo.jpg",
+    img: "",
     amount: 500,
     type: "income"
   },
   {
     name: "Jane Smith",
     time: "2:30 PM",
-    img: "https://example.com/photo2.jpg",
+    img: "",
     amount: 300,
     type: "dues"
   },
   {
     name: "John Doe",
     time: "10:00 AM",
-    img: "https://example.com/photo.jpg",
+    img: "",
     amount: 500,
     type: "income"
   },
   {
     name: "Jane Smith",
     time: "2:30 PM",
-    img: "https://example.com/photo2.jpg",
+    img: "",
     amount: 300,
     type: "dues"
   },
@@ -270,7 +271,7 @@ const transactions= [
 
   const renderItem = ({ item }) => (
     <View style={styles.transactionCard}>
-      <Image source={{ uri: item.img }} style={styles.transactionImage} />
+      <Image source={item.img ? { uri: item.img } : placeholder} style={styles.transactionImage} />
       <View style={styles.transactionText}>
         <Text style={styles.name}>{item.name}</Text>
         <Text style={styles.time}>{item.time}</Text>

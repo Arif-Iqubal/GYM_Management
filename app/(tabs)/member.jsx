@@ -1,172 +1,180 @@
-// MemberForm.jsx
-import React, { useState } from 'react';
-import {
-  View, Text, TextInput, Button, StyleSheet, ScrollView, ToastAndroid,
-} from 'react-native';
-import { Picker } from '@react-native-picker/picker';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { db } from '../../config/firebaseconfig';
-import { collection, addDoc } from 'firebase/firestore';
-import uuid from 'react-native-uuid';
+import React, { useEffect, useState } from 'react';
+import { View, FlatList, Text, Image, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
+import { auth, db } from '../../config/firebaseconfig';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import colors from "@/assets/colors";
+import { reload } from 'firebase/auth';
 
-const MemberForm = () => {
-  const [form, setForm] = useState({
-    name: '',
-    mobile: '',
-    gender: 'Male',
-    trainingType: '',
-    email: '',
-    dob: new Date(),
-    gymPlan: '1 Month',
-    admissionFee: '',
-    joiningDate: new Date(),
-    paidAmount: '',
-    paymentMethod: 'Cash',
-    dues: '',
-    comments: '',
-    address: '',
-  });
+const FILTERS = ['all', 'active', 'expired', 'dues', 'paid'];
 
-  const [showDOBPicker, setShowDOBPicker] = useState(false);
-  const [showJoinPicker, setShowJoinPicker] = useState(false);
+export default function App() {
+  const [members, setMembers] = useState([]);
+  const [filteredMembers, setFilteredMembers] = useState([]);
+  const [selectedFilter, setSelectedFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const handleChange = (name, value) => {
-    setForm({ ...form, [name]: value });
-  };
-
-  const handleSubmit = async () => {
-    const memberId = uuid.v4().slice(0, 8); // short unique ID
-
+  const fetchMembers = async () => {
     try {
-      await addDoc(collection(db, 'members'), {
-        ...form,
-        memberId,
-        dob: form.dob.toISOString(),
-        joiningDate: form.joiningDate.toISOString(),
-        createdAt: new Date().toISOString(),
-      });
-
-      ToastAndroid.show('Member added successfully!', ToastAndroid.LONG);
-      setForm({
-        name: '',
-        mobile: '',
-        gender: 'Male',
-        trainingType: '',
-        email: '',
-        dob: new Date(),
-        gymPlan: '1 Month',
-        admissionFee: '',
-        joiningDate: new Date(),
-        paidAmount: '',
-        paymentMethod: 'Cash',
-        dues: '',
-        comments: '',
-        address: '',
-      });
-    } catch (error) {
-      console.error('Error adding member:', error);
-      ToastAndroid.show('Error adding member', ToastAndroid.LONG);
+       const user = auth.currentUser;
+            // await reload(user);
+      await reload(user); 
+      const adminId = 'ecNCqm8PgxOEgG9S7puVpm2hVZn2';
+      let q = collection(db, 'admin', adminId, 'members');
+      if (selectedFilter !== 'all') {
+        q = query(q, where('status', '==', selectedFilter));
+      }
+      const snapshot = await getDocs(q);
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setMembers(data);
+    } catch (err) {
+      console.error(err);
     }
   };
 
-  return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Add Gym Member</Text>
+  useEffect(() => {
+    fetchMembers();
+  }, [selectedFilter]);
 
-      <TextInput placeholder="Name" value={form.name} onChangeText={text => handleChange('name', text)} style={styles.input} />
-      <TextInput placeholder="Mobile Number" keyboardType="phone-pad" value={form.mobile} onChangeText={text => handleChange('mobile', text)} style={styles.input} />
-      <TextInput placeholder="Email" value={form.email} onChangeText={text => handleChange('email', text)} style={styles.input} />
-      <TextInput placeholder="Training Type" value={form.trainingType} onChangeText={text => handleChange('trainingType', text)} style={styles.input} />
+  useEffect(() => {
+    const results = members.filter(member =>
+      member.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    setFilteredMembers(results);
+  }, [searchQuery, members]);
 
-      <Text style={styles.label}>Gender</Text>
-      <Picker selectedValue={form.gender} onValueChange={value => handleChange('gender', value)} style={styles.picker}>
-        <Picker.Item label="Male" value="Male" />
-        <Picker.Item label="Female" value="Female" />
-        <Picker.Item label="Other" value="Other" />
-      </Picker>
-
-      <Text style={styles.label}>Date of Birth</Text>
-      <Button title={form.dob.toDateString()} onPress={() => setShowDOBPicker(true)} />
-      {showDOBPicker && (
-        <DateTimePicker
-          value={form.dob}
-          mode="date"
-          display="default"
-          onChange={(_, date) => {
-            setShowDOBPicker(false);
-            if (date) handleChange('dob', date);
-          }}
-        />
-      )}
-
-      <Text style={styles.label}>Select Gym Plan</Text>
-      <Picker selectedValue={form.gymPlan} onValueChange={value => handleChange('gymPlan', value)} style={styles.picker}>
-        <Picker.Item label="1 Month" value="1000" />
-        <Picker.Item label="3 Months" value="2000" />
-        <Picker.Item label="6 Months" value="3000" />
-      </Picker>
-
-      <TextInput placeholder="Admission Fees" keyboardType="numeric" value={form.admissionFee} onChangeText={text => handleChange('admissionFee', text)} style={styles.input} />
-      <TextInput placeholder="Paid Amount" keyboardType="numeric" value={form.paidAmount} onChangeText={text => handleChange('paidAmount', text)} style={styles.input} />
-      <TextInput placeholder="Dues" keyboardType="numeric" value={form.dues} onChangeText={text => handleChange('dues', text)} style={styles.input} />
-
-      <Text style={styles.label}>Select Joining Date</Text>
-      <Button title={form.joiningDate.toDateString()} onPress={() => setShowJoinPicker(true)} />
-      {showJoinPicker && (
-        <DateTimePicker
-          value={form.joiningDate}
-          mode="date"
-          display="default"
-          onChange={(_, date) => {
-            setShowJoinPicker(false);
-            if (date) handleChange('joiningDate', date);
-          }}
-        />
-      )}
-
-      <Text style={styles.label}>Payment Method</Text>
-      <Picker selectedValue={form.paymentMethod} onValueChange={value => handleChange('paymentMethod', value)} style={styles.picker}>
-        <Picker.Item label="Cash" value="Cash" />
-        <Picker.Item label="UPI" value="UPI" />
-        <Picker.Item label="Card" value="Card" />
-        <Picker.Item label="Other" value="Other" />
-      </Picker>
-
-      <TextInput placeholder="Address" value={form.address} onChangeText={text => handleChange('address', text)} style={styles.input} />
-      <TextInput placeholder="Comments" value={form.comments} onChangeText={text => handleChange('comments', text)} style={styles.input} />
-
-      <Button title="Submit" onPress={handleSubmit} color="#6200ee" />
-    </ScrollView>
+  const renderMemberCard = (member) => (
+    <View style={styles.card} key={member.id}>
+      <Image
+        source={
+          member.imageUrl?.data
+            ? { uri: member.imageUrl?.data }
+            : require('../../assets/images/Avatar/man3.png') // ✅ your local fallback image
+        } style={styles.avatar} />
+      <Text style={styles.name}>{member.name}</Text>
+      <View style={styles.details}>
+        <Text style={styles.left}>Days: {member.joiningDate}</Text>
+        <Text style={styles.right}>₹{member.dues}</Text>
+      </View>
+    </View>
   );
-};
 
-export default MemberForm;
+  const groupIntoPairs = (arr) => {
+    const pairs = [];
+    for (let i = 0; i < arr.length; i += 2) {
+      pairs.push([arr[i], arr[i + 1]]);
+    }
+    return pairs;
+  };
+
+  return (
+
+    <SafeAreaView style={styles.container}>
+    {/* <View style={styles.container}> */}
+      {/* Search bar */}
+      <TextInput
+        style={styles.searchInput}
+        placeholder="Search by name..."
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+      />
+
+      {/* Filter bar */}
+      <View style={styles.filterBar}>
+        {FILTERS.map(filter => (
+          <TouchableOpacity
+            key={filter}
+            style={[
+              styles.filterButton,
+              selectedFilter === filter && styles.activeFilter
+            ]}
+            onPress={() => {
+              setSelectedFilter(filter);
+              setSearchQuery('');
+            }}
+          >
+            <Text style={styles.filterText}>{filter.toUpperCase()}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Member list */}
+      <FlatList
+        data={groupIntoPairs(filteredMembers)}
+        keyExtractor={(item, index) => index.toString()}
+        renderItem={({ item }) => (
+          <View style={styles.row}>
+            {renderMemberCard(item[0])}
+            {item[1] ? renderMemberCard(item[1]) : <View style={styles.card} />}
+          </View>
+        )}
+        ListEmptyComponent={<Text style={{ textAlign: 'center', marginTop: 20 , color: colors.twhite}}>No members found.</Text>}
+      />
+    {/* </View> */}
+
+    </SafeAreaView>
+  );
+}
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 16,
-    backgroundColor: '#fff',
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    color: '#6200ee',
-    textAlign: 'center',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    padding: 10,
+  container: { flex: 1, padding: 10, backgroundColor: colors.dblack },
+  searchInput: {
+    backgroundColor: colors.gwhite,
+    padding: 8,
     borderRadius: 8,
-    marginBottom: 12,
+    marginBottom: 10
   },
-  label: {
+  filterBar: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 10,
+    justifyContent: 'center'
+  },
+  filterButton: {
+    backgroundColor: colors.twhite,
+    padding: 8,
+    margin: 5,
+    borderRadius: 10
+  },
+  activeFilter: {
+    backgroundColor: colors.gwhite
+  },
+  filterText: {
+    fontSize: 12,
+    color: '#000'
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10
+  },
+  card: {
+    backgroundColor: colors.wblack,
+    borderRadius: 12,
+    padding: 10,
+    width: '48%',
+    alignItems: 'center',
+    elevation: 2,
+    borderWidth : 0.4,
+    borderColor : colors.twhite,
+  },
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginBottom: 6
+  },
+  name: {
     fontWeight: 'bold',
-    marginTop: 12,
+    fontSize: 14,
+    marginBottom: 6,
+    color : colors.gwhite
   },
-  picker: {
-    backgroundColor: '#f0f0f0',
-    marginBottom: 12,
+  details: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%'
   },
+  left: { fontSize: 12, color: colors.twhite },
+  right: { fontSize: 12, color: '#e74c3c' }
 });

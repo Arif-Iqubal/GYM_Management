@@ -116,7 +116,7 @@ const SignUp = () => {
     };
 
     // ✅ Use UID as Firestore document ID
-    await setDoc(doc(db, 'users', user?.uid), data);
+    await setDoc(doc(db, 'admin', user?.uid), data);
     setUserDetail(data);
   };
 
