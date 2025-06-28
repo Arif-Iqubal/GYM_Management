@@ -14,42 +14,141 @@
 import colors from "@/assets/colors";
 import placeholder from '../../assets/images/Avatar/man3.png'
 
-import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, Image, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, FlatList, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import { PieChart } from 'react-native-chart-kit';
 import { Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { db } from '../../config/firebaseconfig'; // your firebase config
-import { collection, getDocs } from 'firebase/firestore';
+// import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { moderateScale, moderateVerticalScale } from "react-native-size-matters";
 import { Directions } from "react-native-gesture-handler";
-
+import { setIn } from "formik";
+import { reload } from "firebase/auth";
+import { useFocusEffect } from '@react-navigation/native';
+import { collectionGroup, query, orderBy, limit, getDocs, doc, getDoc ,collection} from 'firebase/firestore';
+import { ScrollView } from 'react-native-virtualized-view';
 const screenWidth = Dimensions.get('window').width;
+
 
 const home = () => {
   // const [transactions, setTransactions] = useState([]);
   const [income, setIncome] = useState(0);
   const [dues, setDues] = useState(0);
+  // const [month, setMonth] = useState('');
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const today = new Date();
+  const month = monthNames[today.getMonth()];
+    const [adminUID, setAdminUID] = useState("ecNCqm8PgxOEgG9S7puVpm2hVZn2");
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const querySnapshot = await getDocs(collection(db, 'transactions'));
-      let incomeSum = 11000;
-      let duesSum = 350;
-      const data = querySnapshot.docs.map(doc => {
-        const item = doc.data();
-        if (item.type === 'income') incomeSum += item.amount;
-        else duesSum += item.amount;
-        return item;
-      });
-      setTransactions(data);
-      setIncome(incomeSum);
-      setDues(duesSum);
-    };
+    // Fetching Current Month Income and Dues
 
-    fetchData();
-  }, []);
+//     const fetchCurrentMonthSummary = async () => {
+//   try {
+//     const today = new Date();
+//     const year = today.getFullYear().toString();      // e.g., "2025"
+//     const month = String(today.getMonth() + 1).padStart(2, '0'); // "01" to "12"
+//     // setMonth(month);
+    
+//     const summaryRef = doc(db, 'admin', adminUID, 'financialSummary', year);
+//     const docSnap = await getDoc(summaryRef);
+
+//     if (docSnap.exists()) {
+//       const data = docSnap.data();
+//       const monthly = data.monthly || {};
+
+//       const currentMonthData = monthly[month] || { income: 0, dues: 0 };
+//       console.log(`✅ Income: ₹${currentMonthData.income}, Dues: ₹${currentMonthData.dues}`);
+//         setIncome(currentMonthData.income);
+//          setDues(currentMonthData.dues);
+//       return currentMonthData;
+//     } else {
+//       console.log('📭 No financial summary document found.');
+       
+//       return { income: 0, dues: 0 };
+//     }
+//   } catch (error) {
+//     console.error('❌ Error fetching current month summary:', error.message);
+//     return { income: 0, dues: 0 };
+//   }
+// };
+
+
+// const [summary, setSummary] = useState({ income: 0, dues: 0 });
+
+// useEffect(() => {
+//   const adminId = 'your_admin_uid_here';
+//   const getSummary = async () => {
+//     const currentMonthSummary = await fetchCurrentMonthSummary(adminId);
+//     setSummary(currentMonthSummary);
+//   };
+
+//   getSummary();
+//   setIncome(summary.income);
+//   setDues(summary.dues);
+// }, []);
+
+
+
+
+
+
+const fetchCurrentMonthSummary = async () => {
+  try {
+    const today = new Date();
+    const year = today.getFullYear().toString();
+    const month = String(today.getMonth() + 1).padStart(2, '0'); // e.g. "06"
+
+    const summaryRef = doc(db, 'admin', adminUID, 'financialSummary', year);
+    const docSnap = await getDoc(summaryRef);
+
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      const currentMonthData = data.monthly?.[month] || { income: 0, dues: 0 };
+      setIncome(currentMonthData.income);
+      setDues(currentMonthData.dues);
+    } else {
+      setIncome(0);
+      setDues(0);
+    }
+  } catch (err) {
+    console.error("Error loading summary:", err.message);
+    setIncome(0);
+    setDues(0);
+  }
+};
+
+useFocusEffect(
+  useCallback(() => {
+    fetchCurrentMonthSummary();
+  }, [])
+);
+
+
+
+
+
+//  here fetching income and dues ends
+
+  // useEffect(() => {
+  //   const fetchData = async () => {
+  //     const querySnapshot = await getDocs(doc(db, 'admin', adminUID, 'financialSummary', String(year)));
+  //     let incomeSum = 11000;
+  //     let duesSum = 350;
+  //     const data = querySnapshot.docs.map(doc => {
+  //       const item = doc.data();
+  //       if (item.type === 'income') incomeSum += item.amount;
+  //       else duesSum += item.amount;
+  //       return item;
+  //     });
+  //     setTransactions(data);
+  //     setIncome(incomeSum);
+  //     setDues(duesSum);
+  //   };
+
+  //   fetchData();
+  // }, []);
 
   const chartData = [
     {
@@ -70,216 +169,272 @@ const home = () => {
 
 
   
-const transactions= [
-  {
-    name: "John Doe",
-    time: "10:00 AM",
-    img: "",
-    amount: 500,
-    type: "income"
-  },
-  {
-    name: "Jane Smith",
-    time: "2:30 PM",
-    img: "",
-    amount: 300,
-    type: "dues"
-  },
-  {
-    name: "John Doe",
-    time: "10:00 AM",
-    img: "",
-    amount: 500,
-    type: "income"
-  },
-  {
-    name: "Jane Smith",
-    time: "2:30 PM",
-    img: "",
-    amount: 300,
-    type: "dues"
-  },
-  {
-    name: "John Doe",
-    time: "10:00 AM",
-    img: "",
-    amount: 500,
-    type: "income"
-  },
-  {
-    name: "Jane Smith",
-    time: "2:30 PM",
-    img: "",
-    amount: 300,
-    type: "dues"
-  },
-  {
-    name: "John Doe",
-    time: "10:00 AM",
-    img: "",
-    amount: 500,
-    type: "income"
-  },
-  {
-    name: "Jane Smith",
-    time: "2:30 PM",
-    img: "",
-    amount: 300,
-    type: "dues"
-  },
-  {
-    name: "John Doe",
-    time: "10:00 AM",
-    img: "",
-    amount: 500,
-    type: "income"
-  },
-  {
-    name: "Jane Smith",
-    time: "2:30 PM",
-    img: "",
-    amount: 300,
-    type: "dues"
-  },
-  {
-    name: "John Doe",
-    time: "10:00 AM",
-    img: "",
-    amount: 500,
-    type: "income"
-  },
-  {
-    name: "Jane Smith",
-    time: "2:30 PM",
-    img: "",
-    amount: 300,
-    type: "dues"
-  },
-  {
-    name: "John Doe",
-    time: "10:00 AM",
-    img: "",
-    amount: 500,
-    type: "income"
-  },
-  {
-    name: "Jane Smith",
-    time: "2:30 PM",
-    img: "",
-    amount: 300,
-    type: "dues"
-  },
-  {
-    name: "John Doe",
-    time: "10:00 AM",
-    img: "",
-    amount: 500,
-    type: "income"
-  },
-  {
-    name: "Jane Smith",
-    time: "2:30 PM",
-    img: "",
-    amount: 300,
-    type: "dues"
-  },
-  {
-    name: "John Doe",
-    time: "10:00 AM",
-    img: "",
-    amount: 500,
-    type: "income"
-  },
-  {
-    name: "Jane Smith",
-    time: "2:30 PM",
-    img: "",
-    amount: 300,
-    type: "dues"
-  },
-  {
-    name: "John Doe",
-    time: "10:00 AM",
-    img: "",
-    amount: 500,
-    type: "income"
-  },
-  {
-    name: "Jane Smith",
-    time: "2:30 PM",
-    img: "",
-    amount: 300,
-    type: "dues"
-  },
-  {
-    name: "John Doe",
-    time: "10:00 AM",
-    img: "",
-    amount: 500,
-    type: "income"
-  },
-  {
-    name: "Jane Smith",
-    time: "2:30 PM",
-    img: "",
-    amount: 300,
-    type: "dues"
-  },
-  {
-    name: "John Doe",
-    time: "10:00 AM",
-    img: "",
-    amount: 500,
-    type: "income"
-  },
-  {
-    name: "Jane Smith",
-    time: "2:30 PM",
-    img: "",
-    amount: 300,
-    type: "dues"
-  },
-  {
-    name: "John Doe",
-    time: "10:00 AM",
-    img: "",
-    amount: 500,
-    type: "income"
-  },
-  {
-    name: "Jane Smith",
-    time: "2:30 PM",
-    img: "",
-    amount: 300,
-    type: "dues"
-  },
-  {
-    name: "John Doe",
-    time: "10:00 AM",
-    img: "",
-    amount: 500,
-    type: "income"
-  },
-  {
-    name: "Jane Smith",
-    time: "2:30 PM",
-    img: "",
-    amount: 300,
-    type: "dues"
-  },
-];
+// const transactions= [
+//   {
+//     name: "John Doe",
+//     time: "10:00 AM",
+//     img: "",
+//     amount: 500,
+//     type: "income"
+//   },
+//   {
+//     name: "Jane Smith",
+//     time: "2:30 PM",
+//     img: "",
+//     amount: 300,
+//     type: "dues"
+//   },
+//   {
+//     name: "John Doe",
+//     time: "10:00 AM",
+//     img: "",
+//     amount: 500,
+//     type: "income"
+//   },
+//   {
+//     name: "Jane Smith",
+//     time: "2:30 PM",
+//     img: "",
+//     amount: 300,
+//     type: "dues"
+//   },
+//   {
+//     name: "John Doe",
+//     time: "10:00 AM",
+//     img: "",
+//     amount: 500,
+//     type: "income"
+//   },
+//   {
+//     name: "Jane Smith",
+//     time: "2:30 PM",
+//     img: "",
+//     amount: 300,
+//     type: "dues"
+//   },
+//   {
+//     name: "John Doe",
+//     time: "10:00 AM",
+//     img: "",
+//     amount: 500,
+//     type: "income"
+//   },
+//   {
+//     name: "Jane Smith",
+//     time: "2:30 PM",
+//     img: "",
+//     amount: 300,
+//     type: "dues"
+//   },
+//   {
+//     name: "John Doe",
+//     time: "10:00 AM",
+//     img: "",
+//     amount: 500,
+//     type: "income"
+//   },
+//   {
+//     name: "Jane Smith",
+//     time: "2:30 PM",
+//     img: "",
+//     amount: 300,
+//     type: "dues"
+//   },
+//   {
+//     name: "John Doe",
+//     time: "10:00 AM",
+//     img: "",
+//     amount: 500,
+//     type: "income"
+//   },
+//   {
+//     name: "Jane Smith",
+//     time: "2:30 PM",
+//     img: "",
+//     amount: 300,
+//     type: "dues"
+//   },
+//   {
+//     name: "John Doe",
+//     time: "10:00 AM",
+//     img: "",
+//     amount: 500,
+//     type: "income"
+//   },
+//   {
+//     name: "Jane Smith",
+//     time: "2:30 PM",
+//     img: "",
+//     amount: 300,
+//     type: "dues"
+//   },
+//   {
+//     name: "John Doe",
+//     time: "10:00 AM",
+//     img: "",
+//     amount: 500,
+//     type: "income"
+//   },
+//   {
+//     name: "Jane Smith",
+//     time: "2:30 PM",
+//     img: "",
+//     amount: 300,
+//     type: "dues"
+//   },
+//   {
+//     name: "John Doe",
+//     time: "10:00 AM",
+//     img: "",
+//     amount: 500,
+//     type: "income"
+//   },
+//   {
+//     name: "Jane Smith",
+//     time: "2:30 PM",
+//     img: "",
+//     amount: 300,
+//     type: "dues"
+//   },
+//   {
+//     name: "John Doe",
+//     time: "10:00 AM",
+//     img: "",
+//     amount: 500,
+//     type: "income"
+//   },
+//   {
+//     name: "Jane Smith",
+//     time: "2:30 PM",
+//     img: "",
+//     amount: 300,
+//     type: "dues"
+//   },
+//   {
+//     name: "John Doe",
+//     time: "10:00 AM",
+//     img: "",
+//     amount: 500,
+//     type: "income"
+//   },
+//   {
+//     name: "Jane Smith",
+//     time: "2:30 PM",
+//     img: "",
+//     amount: 300,
+//     type: "dues"
+//   },
+//   {
+//     name: "John Doe",
+//     time: "10:00 AM",
+//     img: "",
+//     amount: 500,
+//     type: "income"
+//   },
+//   {
+//     name: "Jane Smith",
+//     time: "2:30 PM",
+//     img: "",
+//     amount: 300,
+//     type: "dues"
+//   },
+//   {
+//     name: "John Doe",
+//     time: "10:00 AM",
+//     img: "",
+//     amount: 500,
+//     type: "income"
+//   },
+//   {
+//     name: "Jane Smith",
+//     time: "2:30 PM",
+//     img: "",
+//     amount: 300,
+//     type: "dues"
+//   },
+//   {
+//     name: "John Doe",
+//     time: "10:00 AM",
+//     img: "",
+//     amount: 500,
+//     type: "income"
+//   },
+//   {
+//     name: "Jane Smith",
+//     time: "2:30 PM",
+//     img: "",
+//     amount: 300,
+//     type: "dues"
+//   },
+// ];
 
-  const renderItem = ({ item }) => (
-    <View style={styles.transactionCard}>
-      <Image source={item.img ? { uri: item.img } : placeholder} style={styles.transactionImage} />
-      <View style={styles.transactionText}>
-        <Text style={styles.name}>{item.name}</Text>
-        <Text style={styles.time}>{item.time}</Text>
-      </View>
-      <Text style={styles.amount}>₹{item.amount}</Text>
-    </View>
-  );
+// Fetching Transaction History of 30 members
 
+
+
+const fetchRecentTransactions = async (adminId) => {
+  try {
+    const q = query(
+      collectionGroup(db, 'transactions'),
+      orderBy('paymentDate', 'desc'),
+      limit(30)
+    );
+
+    const snapshot = await getDocs(q);
+    console.log(`📦 Fetched ${snapshot.docs.length} transactions`);
+
+    const transactions = [];
+
+    for (const docSnap of snapshot.docs) {
+      const txnData = docSnap.data();
+      const pathSegments = docSnap.ref.path.split('/');
+      const memberId = pathSegments[3];
+
+      const memberRef = doc(db, 'admin', adminId, 'members', memberId);
+      const memberSnap = await getDoc(memberRef);
+      const memberData = memberSnap.exists() ? memberSnap.data() : {};
+
+      transactions.push({
+        id: docSnap.id,
+        memberId,
+        memberName: txnData.memberName || memberData.name || "Unknown",
+        paymentDate: txnData.paymentDate,
+        amountPaid: txnData.amountPaid,
+        imageUrl: memberData.imageUrl || '',
+      });
+    }
+
+    return transactions;
+  } catch (error) {
+    console.error('❌ Error fetching transactions:', error.message);
+    return [];
+  }
+};
+
+const [transactions, setTransactions] = useState([]);
+
+useFocusEffect(
+  useCallback(() => {
+  const adminId = adminUID; // your actual admin UID
+
+  const loadTransactions = async () => {
+    const data = await fetchRecentTransactions(adminId);
+     console.log("🚀 Transactions:", data);
+    setTransactions(data);
+  };
+
+  loadTransactions();
+ // Optional cleanup function
+    return () => {};
+  }, [adminUID])
+);
+
+
+
+
+
+
+ 
   return (
     <SafeAreaView style={styles.container}>
      
@@ -290,12 +445,13 @@ const transactions= [
           <Ionicons name="notifications-outline" size={24} color={colors.gwhite} />
         </TouchableOpacity>
       </View>
+       <ScrollView>
  <View style={styles.container2}>
       {/* Chart Name */}
       <View style={styles.finance_box}>
       <Text style={styles.chartTitle}>Revenue</Text>
       <View style={styles.finance_box_in}>
-      <Text style={styles.chartdate}>Aug</Text>
+      <Text style={styles.chartdate}>{month}</Text>
 
       {/* Pie Chart */}
       <PieChart
@@ -309,6 +465,7 @@ const transactions= [
         backgroundColor="transparent"
         paddingLeft="15"
         absolute
+        
       />
 
       {/* Income & Dues */}
@@ -326,13 +483,51 @@ const transactions= [
       {/* Transactions */}
       <Text style={styles.sectionTitle}>Recent Transactions</Text>
       <View style={styles.flatlisting}>
-      <FlatList
+      {/* <FlatList
         data={transactions}
         keyExtractor={(item, index) => index.toString()}
         renderItem={renderItem}
-      />
+      /> */}
+      {transactions.length > 0 ? (
+  <FlatList
+    data={transactions}
+    keyExtractor={(item) => item.id + item.paymentDate} 
+    renderItem={({ item }) => (
+      <View style={styles.card}>
+        {item.imageUrl.data ? (
+  <Image source={{ uri: item.imageUrl.data }} style={styles.image} />
+) : (
+  <View style={[styles.image, { backgroundColor: '#ccc' }]} />
+)}
+        <View style={{ marginLeft: 10 }}>
+          <Text style={styles.name}>{item.memberName}</Text>
+          <Text>Paid: ₹{item.amountPaid}</Text>
+          <Text>
+  Date: {new Date(item.paymentDate).toLocaleString('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true, // Use true if you want AM/PM
+  })}
+</Text>
+        </View>
+      </View>
+    )}
+  />
+) : (
+  <Text style={{ textAlign: 'center', marginTop: 20, color: 'white'}}>
+    💤 No recent transactions found.
+  </Text>
+)}
+
       </View>
       </View>
+      <View style={styles.blankbox}>
+
+      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -474,6 +669,25 @@ const styles = StyleSheet.create({
     color: colors.mgreen,
     paddingRight : 10,
   },
+   card: {
+    flexDirection: 'row',
+    padding: 10,
+    backgroundColor: '#fff',
+    marginVertical: 5,
+    borderRadius: 10,
+    elevation: 3,
+  },
+  image: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  blankbox: {
+    width: 50,
+    height: moderateScale(125),
+    // borderRadius: 25,
+  },
+ 
 });
 
 export default home;

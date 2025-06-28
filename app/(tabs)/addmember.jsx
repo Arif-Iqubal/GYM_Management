@@ -22,8 +22,9 @@ import React, { useEffect, useState } from 'react';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { db } from '../../config/firebaseconfig';
-import { collection, addDoc, onSnapshot } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot,doc, setDoc,getDoc } from 'firebase/firestore';
 import uuid from 'react-native-uuid';
+// import { format } from 'date-fns';
 
 const onAgree = () => {
   router.push("/home");
@@ -73,6 +74,17 @@ const addmember = () => {
     const memberId = uuid.v4().slice(0, 8); // short unique ID
     const uid = adminUID || auth.currentUser?.uid;
     console.log(uid);
+      const today = new Date();
+  const year = today.getFullYear();
+  const monthIndex = today.getMonth();
+  const planDuration = parseInt(form.gymPlanduration) || 30;
+
+
+  
+  // Calculate expiry date
+  const joinDateObj = new Date(form.joiningDate);
+  const planExpireDate = new Date(joinDateObj);
+  planExpireDate.setDate(joinDateObj.getDate() + planDuration);
 
     try {
       // const imageUrl = await uploadFileToCloudinary(image);
@@ -84,20 +96,138 @@ const addmember = () => {
         imageUrl,
         dob: form.dob.toISOString(),
         joiningDate: form.joiningDate.toISOString(),
+           planExpireDate: planExpireDate.toISOString(), // ✅ store expiry
         createdAt: new Date().toISOString(),
       });
 
 
 
       // Step 2: Add initial transaction inside the member document
-      await addDoc(collection(db, 'admin', uid, 'members', memberRef.id, 'transactions'), {
+
+       const today = new Date();
+// const paymentDate = today.toISOString().split('T')[0];
+const monthId = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+
+
+      // await addDoc(collection(db, 'admin', uid, 'members', memberRef.id, 'transactions',monthId), {
+      //   memberName: form.name,
+      //   paymentDate: new Date().toISOString(),
+      //   amountpaid: parseFloat(form.paidAmount) || 0,
+      //   paymentMethod: form.paymentMethod,
+      //   dues: form.dues,
+      //   plandetail: form.gymPlan,
+      //   planduration : form.gymPlanduration,
+      // });
+
+//       const transactionRef = doc(
+//   db,
+//   'admin',
+//   uid,
+//   'members',
+//   memberRef.id,
+//   'transactions',
+//   monthId  // <- this is a DOCUMENT ID
+// );
+
+
+ await addDoc(
+      collection(db, 'admin', uid, 'members', memberRef.id, 'transactions'),
+      {
         memberName: form.name,
-        paymentDate: new Date().toISOString(),
-        amountpaid: parseFloat(form.paidAmount) || 0,
+        paymentDate: today.toISOString(),
+        amountPaid: parseFloat(form.paidAmount) || 0,
         paymentMethod: form.paymentMethod,
-        dues: form.dues,
-        plandetail: form.gymPlan,
-      });
+        dues: parseFloat(form.dues) || 0,
+        planDetail: form.gymPlan,
+        planDuration: planDuration,
+        planExpireDate: planExpireDate.toISOString(),
+        receiptId: `TXN${Date.now()}`
+      }
+    );
+
+
+// await setDoc(transactionRef, {
+//   memberName: form.name,
+//   paymentDate: new Date().toISOString(),
+//   amountPaid: parseFloat(form.paidAmount) || 0,
+//   paymentMethod: form.paymentMethod,
+//   dues: form.dues,
+//   planDetail: form.gymPlan,
+//   planDuration: form.gymPlanduration,
+// });
+
+//updating financialyear summary
+
+const updateFinancialSummary = async (
+  adminId,
+  amountPaid,
+  dues,
+  monthIndex,
+  year
+) => {
+  const month = String(monthIndex + 1).padStart(2, '0'); // "01"–"12"
+  const summaryRef = doc(db, 'admin', adminId, 'financialSummary', String(year));
+
+  try {
+    const docSnap = await getDoc(summaryRef);
+
+    let monthly = {};
+    let yearlyTotal = { income: 0, dues: 0 };
+
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      monthly = data.monthly || {};
+      yearlyTotal = data.yearlyTotal || {};
+    }
+
+    const currentMonthData = monthly[month] || { income: 0, dues: 0 };
+    currentMonthData.income += amountPaid;
+    currentMonthData.dues += dues;
+    monthly[month] = currentMonthData;
+
+    // Recalculate yearly total
+    const allMonths = Object.values(monthly);
+    yearlyTotal.income = allMonths.reduce((sum, m) => sum + (m.income || 0), 0);
+    yearlyTotal.dues = allMonths.reduce((sum, m) => sum + (m.dues || 0), 0);
+
+    await setDoc(summaryRef, {
+      monthly,
+      yearlyTotal,
+    });
+  } catch (err) {
+    console.error('Error updating financial summary:', err.message);
+  }
+};
+
+// await setDoc(transactionRef, {
+//   memberName: form.name,
+//   paymentDate: new Date().toISOString(),
+//   amountPaid: parseFloat(form.paidAmount) || 0,
+//   paymentMethod: form.paymentMethod,
+//   dues: parseFloat(form.dues) || 0,
+//   planDetail: form.gymPlan,
+//   planDuration: form.gymPlanduration,
+// });
+
+// ✅ Update Financial Summary
+await updateFinancialSummary(
+  uid,
+  parseFloat(form.paidAmount) || 0,
+  parseFloat(form.dues) || 0,
+  today.getMonth(), // month index (0 for Jan)
+  today.getFullYear()
+);
+
+
+// Update financial summary
+await updateFinancialSummary(
+  uid,
+  parseFloat(form.paidAmount) || 0,
+  parseFloat(form.dues) || 0,
+  today.getMonth(), // 0–11
+  today.getFullYear()
+);
+
 
       ToastAndroid.show('Member and transaction added successfully!', ToastAndroid.LONG);
 
@@ -110,6 +240,7 @@ const addmember = () => {
         email: '',
         dob: new Date(),
         gymPlan: '1 Month',
+        gymPlanduration: 30,
         admissionFee: '',
         joiningDate: new Date(),
         paidAmount: '',
@@ -498,6 +629,7 @@ const addmember = () => {
             const plan = plans.find(p => p.id === itemValue);
             setSelectedPlan(plan);
             handleChange('gymPlan', plan?.name || ''); // Save plan name in form
+            handleChange('gymPlanduration', plan?.duration || ''); // Save plan name in form
           }}
         >
           <Picker.Item label="-- Select Plan --" value="" />
