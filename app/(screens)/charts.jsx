@@ -1,40 +1,43 @@
-import { View, Text,ScrollView } from 'react-native'
-import React from 'react'
+// import { getAuth, updateEmail, signInWithEmailAndPassword } from "firebase/auth";
+// import { initializeApp } from "firebase/app";
 
+// // Your Firebase config
+// const firebaseConfig = {
+//   apiKey: "AIzaSyCnkw8TwoB2BcHSqGDS6qIfxHHeXw_f9U4",
+//   authDomain: "gym-management-49109.firebaseapp.com",
+//   projectId: "gym-management-49109",
+//   storageBucket: "gym-management-49109.appspot.com",
+//   messagingSenderId: "433938893587",
+//   appId: "1:433938893587:web:d992825f727210af13e8e6",
+//   measurementId: "G-8P25C7LY3G"
+// };
 
-import { BarChart, LineChart, PieChart, PopulationPyramid, RadarChart } from "react-native-gifted-charts";
-// import { ScrollView } from 'react-native-web';
+// const app = initializeApp(firebaseConfig);
+// const auth = getAuth(app);
 
-// ...
-const data=[ {value:50}, {value:80}, {value:90}, {value:70} ]
-const charts = () => {
-  return (
-    <View>
-        <ScrollView>
-      <Text>charts</Text>
+// async function testEmailUpdate(currentEmail, currentPassword, newEmail) {
+//   try {
+//     // Sign in
+//     const userCredential = await signInWithEmailAndPassword(auth, currentEmail, currentPassword);
+//     const user = userCredential.user;
+//     console.log("Signed in as:", user.email, "Verified:", user.emailVerified);
 
+//     // Make sure current email is verified
+//     if (!user.emailVerified) {
+//       throw new Error("Current email is not verified.");
+//     }
 
+//     // Try to update email
+//     await updateEmail(user, newEmail);
+//     console.log("Email updated to:", newEmail);
 
-<BarChart data = {data} />
-<LineChart data = {data} />
-<PieChart data = {data} />
-<PopulationPyramid data = {[{left:10,right:12}, {left:9,right:8}]} />
-<RadarChart data = {[50, 80, 90, 70]} />
+//     // Send verification to new email
+//     await user.sendEmailVerification();
+//     console.log("Verification email sent to new email.");
+//   } catch (error) {
+//     console.error("Email update error:", error.code, error.message);
+//   }
+// }
 
-{/* // For Horizontal Bar chart, just add the prop horizontal to the <BarChart/> component */}
-
-<BarChart data = {data} horizontal />
-
-{/* // For Area chart, just add the prop areaChart to the <LineChart/> component */}
-
-<LineChart data = {data} areaChart />
-
-{/* // For Donut chart, just add the prop donut to the <PieChart/> component */}
-
-<PieChart data = {data} donut />
-</ScrollView>
-    </View>
-  )
-}
-
-export default charts
+// // Usage:
+// testEmailUpdate("your_current_email@gmail.com", "your_password", "your_new_email@gmail.com");

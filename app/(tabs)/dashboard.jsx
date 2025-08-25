@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { View, FlatList, Text, Image, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
-import { db } from '../../config/firebaseconfig';
 import { collection, getDocs, query, where } from 'firebase/firestore';
+import React, { useEffect, useState } from 'react';
+import { FlatList, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { db } from '../../config/firebaseconfig';
 
 const FILTERS = ['all', 'active', 'expired', 'dues', 'paid'];
 
@@ -32,28 +32,33 @@ export default function App() {
 
   useEffect(() => {
     const results = members.filter(member =>
-      member.name.toLowerCase().includes(searchQuery.toLowerCase())
+      member && member.name && member.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
     setFilteredMembers(results);
   }, [searchQuery, members]);
 
-  const renderMemberCard = (member) => (
-    <View style={styles.card} key={member.id}>
-      <Image
-              source={
-                member.imageUrl?.data
-                  ? { uri: member.imageUrl?.data }
-                  : require('../../assets/images/Avatar/man3.png') // ✅ your local fallback image
-              } style={styles.avatar} />
-      <Text style={styles.name}>{member.name}</Text>
-      <View style={styles.details}>
-        <Text style={styles.left}>Days: {member.remainingDays}</Text>
-        <Text style={styles.right}>₹{member.duesAmount}</Text>
+  const renderMemberCard = (member) => {
+    if (!member || !member.name) return <View style={styles.card} />;
+    
+    return (
+      <View style={styles.card} key={member.id || Math.random()}>
+        <Image
+          source={
+            member.imageUrl?.data
+              ? { uri: member.imageUrl?.data }
+              : require('../../assets/images/Avatar/man3.png') // ✅ your local fallback image
+          } style={styles.avatar} />
+        <Text style={styles.name}>{member.name || 'Unknown'}</Text>
+        <View style={styles.details}>
+          <Text style={styles.left}>Days: {member.remainingDays || 'N/A'}</Text>
+          <Text style={styles.right}>₹{member.duesAmount || '0'}</Text>
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   const groupIntoPairs = (arr) => {
+    if (!arr || !Array.isArray(arr)) return [];
     const pairs = [];
     for (let i = 0; i < arr.length; i += 2) {
       pairs.push([arr[i], arr[i + 1]]);
@@ -96,8 +101,8 @@ export default function App() {
         keyExtractor={(item, index) => index.toString()}
         renderItem={({ item }) => (
           <View style={styles.row}>
-            {renderMemberCard(item[0])}
-            {item[1] ? renderMemberCard(item[1]) : <View style={styles.card} />}
+            {renderMemberCard(item && item[0])}
+            {renderMemberCard(item && item[1])}
           </View>
         )}
         ListEmptyComponent={<Text style={{ textAlign: 'center', marginTop: 20 }}>No members found.</Text>}

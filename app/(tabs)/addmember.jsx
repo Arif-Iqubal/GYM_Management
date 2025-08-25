@@ -1,29 +1,24 @@
-import { View, Text, ScrollView, ToastAndroid, TextInput, StyleSheet, TouchableOpacity, Button, Image, ImageBackground, Modal } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import Ionicons from '@expo/vector-icons/Ionicons';
 import colors from "@/assets/colors";
-import { moderateScale } from 'react-native-size-matters';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import Entypo from '@expo/vector-icons/Entypo';
-import { uploadFileToCloudinary } from '../../services/imageService'
+import { ActivityIndicator, Alert, Button, Image, Modal, ScrollView, StyleSheet, Text, TextInput, ToastAndroid, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { moderateScale } from 'react-native-size-matters';
+import { useTheme } from '../../context/ThemeContext';
+import { uploadFileToCloudinary } from '../../services/imageService';
 
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
-import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
 import AntDesign from '@expo/vector-icons/AntDesign';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import Fontisto from '@expo/vector-icons/Fontisto';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 import SimpleLineIcons from '@expo/vector-icons/SimpleLineIcons';
 
 import * as ImagePicker from 'expo-image-picker';
-import placeholder from '../../assets/images/Avatar/man3.png'
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import placeholder from '../../assets/images/Avatar/man3.png';
 
-import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { db } from '../../config/firebaseconfig';
-import { collection, addDoc, onSnapshot,doc, setDoc,getDoc } from 'firebase/firestore';
-import uuid from 'react-native-uuid';
+import { Picker } from '@react-native-picker/picker';
+import { addDoc, collection, doc, getDoc, getDocs, onSnapshot, setDoc } from 'firebase/firestore';
+import { auth, db } from '../../config/firebaseconfig';
 // import { format } from 'date-fns';
 
 const onAgree = () => {
@@ -31,12 +26,47 @@ const onAgree = () => {
 };
 
 
-const addmember = () => {
+const AddMember = () => {
+  const { isDarkMode } = useTheme();
+
+
+  // ...existing code...
 
 
 
 
   const [image, setImage] = useState(null);
+  const [formValid, setFormValid] = useState(false);
+  // Validation helpers
+  const validateEmail = (email) => {
+    return /^\S+@\S+\.\S+$/.test(email);
+  };
+
+  const validateForm = (f) => {
+    console.log('Form state:', f);
+    if (!f) { console.log('No form'); return false; }
+    if (!f.name || f.name.trim().length < 3) { console.log('Name invalid'); return false; }
+    if (!f.mobile || !/^\d{10}$/.test(f.mobile)) { console.log('Mobile invalid'); return false; }
+    if (!f.email || !validateEmail(f.email)) { console.log('Email invalid'); return false; }
+    if (!f.trainingType) { console.log('TrainingType invalid'); return false; }
+    if (!f.gender) { console.log('Gender invalid'); return false; }
+    if (!f.dob) { console.log('DOB invalid'); return false; }
+    if (!f.gymPlan) { console.log('GymPlan invalid'); return false; }
+    if (!f.gymPlanduration || f.gymPlanduration === '') { console.log('GymPlanduration invalid'); return false; }
+    if (f.admissionFee === '' || isNaN(Number(f.admissionFee))) { console.log('AdmissionFee invalid'); return false; }
+    if (!f.joiningDate) { console.log('JoiningDate invalid'); return false; }
+    if (f.paidAmount === '' || isNaN(Number(f.paidAmount))) { console.log('PaidAmount invalid'); return false; }
+    if (!f.paymentMethod) { console.log('PaymentMethod invalid'); return false; }
+    if (!f.address) { console.log('Address invalid'); return false; }
+    return true;
+  };
+
+  // Watch form changes for validation
+  useEffect(() => {
+    setFormValid(validateForm(form));
+  }, [form]);
+  const [loading, setLoading] = useState(false);
+  const [showValidationModal, setShowValidationModal] = useState(false);
   const [modelvisible, setModalVisible] = useState();
   const [user, setUser] = useState(null);
   const [userId, setUserId] = useState(null);
@@ -49,6 +79,7 @@ const addmember = () => {
     email: '',
     dob: new Date(),
     gymPlan: '1 Month',
+    gymPlanduration: 30,
     admissionFee: '',
     joiningDate: new Date(),
     paidAmount: '',
@@ -56,6 +87,9 @@ const addmember = () => {
     dues: '',
     comments: '',
     address: '',
+    activemember: true,
+    newmember: true,
+    expiredmember: false,
   });
 
   const [showDOBPicker, setShowDOBPicker] = useState(false);
@@ -71,167 +105,187 @@ const addmember = () => {
   };
 
   const handleSubmit = async () => {
-    const memberId = uuid.v4().slice(0, 8); // short unique ID
+    console.log('Save pressed');
+    console.log('Form valid:', formValid);
+    if (loading) return;
+    // Field-by-field validation with specific alerts
+    if (!form.name || form.name.trim().length < 3) {
+      Alert.alert('Invalid Name', 'Name must be at least 3 characters.');
+      return;
+    }
+    if (!form.mobile || !/^\d{10}$/.test(form.mobile)) {
+      Alert.alert('Invalid Mobile', 'Mobile number must be 10 digits.');
+      return;
+    }
+    if (!form.email || !validateEmail(form.email)) {
+      Alert.alert('Invalid Email', 'Please enter a valid email address.');
+      return;
+    }
+    if (!form.trainingType) {
+      Alert.alert('Missing Training Type', 'Please enter training type.');
+      return;
+    }
+    if (!form.gender) {
+      Alert.alert('Missing Gender', 'Please select gender.');
+      return;
+    }
+    if (!form.dob) {
+      Alert.alert('Missing DOB', 'Please select date of birth.');
+      return;
+    }
+    if (!form.gymPlan) {
+      Alert.alert('Missing Plan', 'Please select a gym plan.');
+      return;
+    }
+    if (!form.gymPlanduration || form.gymPlanduration === '') {
+      Alert.alert('Missing Plan Duration', 'Please select a valid plan duration.');
+      return;
+    }
+    if (form.admissionFee === '' || isNaN(Number(form.admissionFee))) {
+      Alert.alert('Invalid Admission Fee', 'Please enter a valid admission fee.');
+      return;
+    }
+    if (!form.joiningDate) {
+      Alert.alert('Missing Joining Date', 'Please select joining date.');
+      return;
+    }
+    if (form.paidAmount === '' || isNaN(Number(form.paidAmount))) {
+      Alert.alert('Invalid Paid Amount', 'Please enter a valid paid amount.');
+      return;
+    }
+    if (!form.paymentMethod) {
+      Alert.alert('Missing Payment Method', 'Please select payment method.');
+      return;
+    }
+    if (!form.address) {
+      Alert.alert('Missing Address', 'Please enter address.');
+      return;
+    }
+
+    setLoading(true);
     const uid = adminUID || auth.currentUser?.uid;
-    console.log(uid);
-      const today = new Date();
-  const year = today.getFullYear();
-  const monthIndex = today.getMonth();
-  const planDuration = parseInt(form.gymPlanduration) || 30;
+    console.log('UID:', uid);
+    const today = new Date();
+    const year = today.getFullYear();
+    const monthIndex = today.getMonth();
+    const planDuration = parseInt(form.gymPlanduration) || 30;
 
-
-  
-  // Calculate expiry date
-  const joinDateObj = new Date(form.joiningDate);
-  const planExpireDate = new Date(joinDateObj);
-  planExpireDate.setDate(joinDateObj.getDate() + planDuration);
+    // Calculate expiry date
+    const joinDateObj = new Date(form.joiningDate);
+    const planExpireDate = new Date(joinDateObj);
+    planExpireDate.setDate(joinDateObj.getDate() + planDuration);
 
     try {
-      // const imageUrl = await uploadFileToCloudinary(image);
+      // 1. Get the highest memberid from Firestore (robust extraction)
+      let newMemberId = 1;
+      const membersRef = collection(db, 'admin', uid, 'members');
+      const q = await getDocs(membersRef);
+      let maxId = 0;
+      q.forEach(docSnap => {
+        const data = docSnap.data();
+        if (data.memberid && typeof data.memberid === 'string') {
+          // Extract number from KGF-ID-<number>
+          const match = data.memberid.match(/KGF-ID-(\d+)/);
+          if (match && match[1]) {
+            const num = parseInt(match[1], 10);
+            if (!isNaN(num) && num > maxId) maxId = num;
+          }
+        }
+      });
+      newMemberId = maxId + 1;
+      const memberidString = `KGF-ID-${newMemberId}`;
+
       const imageUrl = await uploadFileToCloudinary(image, "member_images");
-      // console.log(imageUrl);
       const memberRef = await addDoc(collection(db, 'admin', uid, 'members'), {
         ...form,
-        memberId,
+        memberid: memberidString,
         imageUrl,
         dob: form.dob.toISOString(),
         joiningDate: form.joiningDate.toISOString(),
-           planExpireDate: planExpireDate.toISOString(), // ✅ store expiry
+        planExpireDate: planExpireDate.toISOString(),
         createdAt: new Date().toISOString(),
       });
 
-
-
       // Step 2: Add initial transaction inside the member document
+      const today2 = new Date();
+      const monthId = `${today2.getFullYear()}-${String(today2.getMonth() + 1).padStart(2, '0')}`;
 
-       const today = new Date();
-// const paymentDate = today.toISOString().split('T')[0];
-const monthId = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+      await addDoc(
+        collection(db, 'admin', uid, 'members', memberRef.id, 'transactions'),
+        {
+          memberName: form.name,
+          paymentDate: today2.toISOString(),
+          amountPaid: parseFloat(form.paidAmount) || 0,
+          paymentMethod: form.paymentMethod,
+          dues: parseFloat(form.dues) || 0,
+          planDetail: form.gymPlan,
+          planDuration: planDuration,
+          planExpireDate: planExpireDate.toISOString(),
+          receiptId: `TXN${Date.now()}`
+        }
+      );
 
+      //updating financialyear summary
+      const updateFinancialSummary = async (
+        adminId,
+        amountPaid,
+        dues,
+        monthIndex,
+        year
+      ) => {
+        const month = String(monthIndex + 1).padStart(2, '0'); // "01"–"12"
+        const summaryRef = doc(db, 'admin', adminId, 'financialSummary', String(year));
 
-      // await addDoc(collection(db, 'admin', uid, 'members', memberRef.id, 'transactions',monthId), {
-      //   memberName: form.name,
-      //   paymentDate: new Date().toISOString(),
-      //   amountpaid: parseFloat(form.paidAmount) || 0,
-      //   paymentMethod: form.paymentMethod,
-      //   dues: form.dues,
-      //   plandetail: form.gymPlan,
-      //   planduration : form.gymPlanduration,
-      // });
+        try {
+          const docSnap = await getDoc(summaryRef);
 
-//       const transactionRef = doc(
-//   db,
-//   'admin',
-//   uid,
-//   'members',
-//   memberRef.id,
-//   'transactions',
-//   monthId  // <- this is a DOCUMENT ID
-// );
+          let monthly = {};
+          let yearlyTotal = { income: 0, dues: 0 };
 
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            monthly = data.monthly || {};
+            yearlyTotal = data.yearlyTotal || {};
+          }
 
- await addDoc(
-      collection(db, 'admin', uid, 'members', memberRef.id, 'transactions'),
-      {
-        memberName: form.name,
-        paymentDate: today.toISOString(),
-        amountPaid: parseFloat(form.paidAmount) || 0,
-        paymentMethod: form.paymentMethod,
-        dues: parseFloat(form.dues) || 0,
-        planDetail: form.gymPlan,
-        planDuration: planDuration,
-        planExpireDate: planExpireDate.toISOString(),
-        receiptId: `TXN${Date.now()}`
-      }
-    );
+          const currentMonthData = monthly[month] || { income: 0, dues: 0 };
+          currentMonthData.income += amountPaid;
+          currentMonthData.dues += dues;
+          monthly[month] = currentMonthData;
 
+          // Recalculate yearly total
+          const allMonths = Object.values(monthly);
+          yearlyTotal.income = allMonths.reduce((sum, m) => sum + (m.income || 0), 0);
+          yearlyTotal.dues = allMonths.reduce((sum, m) => sum + (m.dues || 0), 0);
 
-// await setDoc(transactionRef, {
-//   memberName: form.name,
-//   paymentDate: new Date().toISOString(),
-//   amountPaid: parseFloat(form.paidAmount) || 0,
-//   paymentMethod: form.paymentMethod,
-//   dues: form.dues,
-//   planDetail: form.gymPlan,
-//   planDuration: form.gymPlanduration,
-// });
+          await setDoc(summaryRef, {
+            monthly,
+            yearlyTotal,
+          });
+        } catch (err) {
+          console.error('Error updating financial summary:', err.message);
+        }
+      };
 
-//updating financialyear summary
+      // ✅ Update Financial Summary
+      await updateFinancialSummary(
+        uid,
+        parseFloat(form.paidAmount) || 0,
+        parseFloat(form.dues) || 0,
+        today.getMonth(),
+        today.getFullYear()
+      );
 
-const updateFinancialSummary = async (
-  adminId,
-  amountPaid,
-  dues,
-  monthIndex,
-  year
-) => {
-  const month = String(monthIndex + 1).padStart(2, '0'); // "01"–"12"
-  const summaryRef = doc(db, 'admin', adminId, 'financialSummary', String(year));
-
-  try {
-    const docSnap = await getDoc(summaryRef);
-
-    let monthly = {};
-    let yearlyTotal = { income: 0, dues: 0 };
-
-    if (docSnap.exists()) {
-      const data = docSnap.data();
-      monthly = data.monthly || {};
-      yearlyTotal = data.yearlyTotal || {};
-    }
-
-    const currentMonthData = monthly[month] || { income: 0, dues: 0 };
-    currentMonthData.income += amountPaid;
-    currentMonthData.dues += dues;
-    monthly[month] = currentMonthData;
-
-    // Recalculate yearly total
-    const allMonths = Object.values(monthly);
-    yearlyTotal.income = allMonths.reduce((sum, m) => sum + (m.income || 0), 0);
-    yearlyTotal.dues = allMonths.reduce((sum, m) => sum + (m.dues || 0), 0);
-
-    await setDoc(summaryRef, {
-      monthly,
-      yearlyTotal,
-    });
-  } catch (err) {
-    console.error('Error updating financial summary:', err.message);
-  }
-};
-
-// await setDoc(transactionRef, {
-//   memberName: form.name,
-//   paymentDate: new Date().toISOString(),
-//   amountPaid: parseFloat(form.paidAmount) || 0,
-//   paymentMethod: form.paymentMethod,
-//   dues: parseFloat(form.dues) || 0,
-//   planDetail: form.gymPlan,
-//   planDuration: form.gymPlanduration,
-// });
-
-// ✅ Update Financial Summary
-await updateFinancialSummary(
-  uid,
-  parseFloat(form.paidAmount) || 0,
-  parseFloat(form.dues) || 0,
-  today.getMonth(), // month index (0 for Jan)
-  today.getFullYear()
-);
-
-
-// Update financial summary
-await updateFinancialSummary(
-  uid,
-  parseFloat(form.paidAmount) || 0,
-  parseFloat(form.dues) || 0,
-  today.getMonth(), // 0–11
-  today.getFullYear()
-);
-
+      // Update financial summary
+      await updateFinancialSummary(
+        uid,
+        parseFloat(form.paidAmount) || 0,
+        parseFloat(form.dues) || 0,
+        today.getMonth(),
+        today.getFullYear()
+      );
 
       ToastAndroid.show('Member and transaction added successfully!', ToastAndroid.LONG);
-
-      // ToastAndroid.show('Member added successfully!', ToastAndroid.LONG);
       setForm({
         name: '',
         mobile: '',
@@ -248,15 +302,18 @@ await updateFinancialSummary(
         dues: '',
         comments: '',
         address: '',
-
       });
       setImage(null);
+      setLoading(false);
       router.push("/home");
     } catch (error) {
       console.error('Error adding member:', error);
       ToastAndroid.show('Error adding member', ToastAndroid.LONG);
+      Alert.alert('Error', error?.message || 'Error adding member');
+      setLoading(false);
     }
   };
+
 
 
 
@@ -467,13 +524,15 @@ await updateFinancialSummary(
 
 
   return (
-    <SafeAreaView style={styles.mainbody}>
-      <View style={styles.headerbox}>
+    <SafeAreaView style={[styles.mainbody, { backgroundColor: isDarkMode ? '#181818' : '#fff' }]}>
+      <View style={[styles.headerbox, { backgroundColor: isDarkMode ? '#232323' : '#fff' }]}>
         <View style={styles.leftnav}>
-          <TouchableOpacity onPress={onAgree} activeOpacity={0.8}><Ionicons name="chevron-back-sharp" size={26} color="white" /></TouchableOpacity>
-          <Text style={styles.navtext}>Add Members</Text>
+          <TouchableOpacity onPress={onAgree} activeOpacity={0.8}><Ionicons name="chevron-back-sharp" size={26} color={isDarkMode ? '#fff' : '#181818'} /></TouchableOpacity>
+          <Text style={[styles.navtext, { color: isDarkMode ? '#fff' : '#181818' }]}>Add Members</Text>
         </View>
-        <TouchableOpacity onPress={handleSubmit} activeOpacity={0.8} style={styles.savebox}><Text style={styles.savetext}>Save</Text></TouchableOpacity>
+        <TouchableOpacity onPress={handleSubmit} activeOpacity={0.8} style={styles.savebox} disabled={loading}>
+          <Text style={[styles.savetext, { color: isDarkMode ? '#181818' : '#181818' }]}>Save</Text>
+        </TouchableOpacity>
       </View>
       {/* <ScrollView >
         <View style={styles.Scrollbody}>
@@ -541,16 +600,16 @@ await updateFinancialSummary(
 
 
 
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView contentContainerStyle={[styles.container, { backgroundColor: isDarkMode ? '#181818' : '#fff' }]}>
 
         <View style={styles.profileimgcontmain}>
           <View style={styles.bg}>
-            <View style={styles.profileimgcont}>
+            <View style={[styles.profileimgcont, { backgroundColor: isDarkMode ? '#232323' : '#e0f7fa' }]}>
               <View style={styles.profileimgin} >
                 {/* <Image style={styles.profileimg} resizeMode="contain" source={image ? { uri: image } : placeholder} />
                  */}
                 <Image
-                resizeMode="contain"
+                  resizeMode="contain"
                   source={
                     image && typeof image === 'object' && image.uri
                       ? { uri: image.uri }
@@ -562,28 +621,37 @@ await updateFinancialSummary(
                 />
               </View>
 
-              <TouchableOpacity onPress={() => setOpenModal(true)} activeOpacity={0.5} style={styles.profileimgcam}><FontAwesome name="camera" size={18} color={colors.cwhite} /></ TouchableOpacity>
+              <TouchableOpacity onPress={() => setOpenModal(true)} activeOpacity={0.5} style={[styles.profileimgcam, { backgroundColor: isDarkMode ? '#232323' : '#fff', borderColor: isDarkMode ? '#333' : '#e0e0e0' }]}><FontAwesome name="camera" size={18} color={isDarkMode ? '#fff' : colors.cwhite} /></ TouchableOpacity>
             </View>
           </View>
         </View>
 
 
         {/* <Text style={styles.title}>Add Gym Member</Text> */}
-        <Text style={styles.label}>Personal Detail</Text>
-        <TextInput placeholder="Name" placeholderTextColor={colors.pholder} value={form.name} onChangeText={text => handleChange('name', text)} style={styles.input} />
-        <TextInput placeholder="Mobile Number" placeholderTextColor={colors.pholder} keyboardType="phone-pad" value={form.mobile} onChangeText={text => handleChange('mobile', text)} style={styles.input} />
-        <TextInput placeholder="Email" placeholderTextColor={colors.pholder} value={form.email} onChangeText={text => handleChange('email', text)} style={styles.input} />
-        <TextInput placeholder="Training Type" placeholderTextColor={colors.pholder} value={form.trainingType} onChangeText={text => handleChange('trainingType', text)} style={styles.input} />
+        <Text style={[styles.label, { color: isDarkMode ? '#fff' : '#181818' }]}>Personal Detail</Text>
+        <TextInput placeholder="Name" placeholderTextColor={isDarkMode ? '#aaa' : colors.pholder} value={form.name} onChangeText={text => handleChange('name', text)} style={[styles.input, { backgroundColor: isDarkMode ? '#232323' : '#f5f5f5', color: isDarkMode ? '#fff' : '#181818', borderColor: isDarkMode ? '#333' : '#ccc' }, form.name && form.name.length < 3 ? { borderColor: 'red' } : null]} />
+        {form.name && form.name.length < 3 && (
+          <Text style={{ color: 'red', marginTop: -8, marginBottom: 4, fontSize: 12 }}>Name must be at least 3 characters</Text>
+        )}
+        <TextInput placeholder="Mobile Number" placeholderTextColor={isDarkMode ? '#aaa' : colors.pholder} keyboardType="phone-pad" value={form.mobile} onChangeText={text => handleChange('mobile', text)} style={[styles.input, { backgroundColor: isDarkMode ? '#232323' : '#f5f5f5', color: isDarkMode ? '#fff' : '#181818', borderColor: isDarkMode ? '#333' : '#ccc' }, form.mobile && form.mobile.length !== 10 ? { borderColor: 'red' } : null]} />
+        {form.mobile && form.mobile.length !== 10 && (
+          <Text style={{ color: 'red', marginTop: -8, marginBottom: 4, fontSize: 12 }}>Mobile number must be 10 digits</Text>
+        )}
+        <TextInput placeholder="Email" placeholderTextColor={isDarkMode ? '#aaa' : colors.pholder} value={form.email} onChangeText={text => handleChange('email', text)} style={[styles.input, { backgroundColor: isDarkMode ? '#232323' : '#f5f5f5', color: isDarkMode ? '#fff' : '#181818', borderColor: isDarkMode ? '#333' : '#ccc' }, form.email && !validateEmail(form.email) ? { borderColor: 'red' } : null]} />
+        {form.email && !validateEmail(form.email) && (
+          <Text style={{ color: 'red', marginTop: -8, marginBottom: 4, fontSize: 12 }}>Enter a valid email address</Text>
+        )}
+        <TextInput placeholder="Training Type" placeholderTextColor={isDarkMode ? '#aaa' : colors.pholder} value={form.trainingType} onChangeText={text => handleChange('trainingType', text)} style={[styles.input, { backgroundColor: isDarkMode ? '#232323' : '#f5f5f5', color: isDarkMode ? '#fff' : '#181818', borderColor: isDarkMode ? '#333' : '#ccc' }]} />
 
-        <Text style={styles.label}>Gender</Text>
-        <Picker selectedValue={form.gender} onValueChange={value => handleChange('gender', value)} style={styles.picker}>
+        <Text style={[styles.label, { color: isDarkMode ? '#fff' : '#181818' }]}>Gender</Text>
+        <Picker selectedValue={form.gender} onValueChange={value => handleChange('gender', value)} style={[styles.picker, { backgroundColor: isDarkMode ? '#232323' : '#f5f5f5', color: isDarkMode ? '#fff' : '#181818' }]}>
           <Picker.Item label="Male" value="Male" />
           <Picker.Item label="Female" value="Female" />
           <Picker.Item label="Other" value="Other" />
         </Picker>
 
-        <Text style={styles.label}>Date of Birth</Text>
-        <Button style={styles.pickstyle} title={form.dob.toDateString()} onPress={() => setShowDOBPicker(true)} />
+        <Text style={[styles.label, { color: isDarkMode ? '#fff' : '#181818' }]}>Date of Birth</Text>
+        <Button style={[styles.pickstyle, { backgroundColor: isDarkMode ? '#232323' : '#f5f5f5', color: isDarkMode ? '#fff' : '#181818' }]} title={form.dob.toDateString()} onPress={() => setShowDOBPicker(true)} />
         {showDOBPicker && (
           <DateTimePicker
             value={form.dob}
@@ -596,40 +664,15 @@ await updateFinancialSummary(
           />
         )}
 
-        <Text style={styles.label}>Select Gym Plan</Text>
-
-        {/* <Picker selectedValue={form.gymPlan} onValueChange={value => handleChange('gymPlan', value)} style={styles.picker}>
-          <Picker.Item label="1 Month" value="1000" />
-          <Picker.Item label="3 Months" value="2000" />
-          <Picker.Item label="6 Months" value="3000" />
-        </Picker> */}
-
-
-        {/* <Picker
-        selectedValue={selectedPlan}
-        style={styles.picker}
-        onValueChange={(itemValue) => setSelectedPlan(itemValue)}
-      >
-        <Picker.Item label="-- Select Plan --" value="" />
-        {plans.map((plan) => (
-          <Picker.Item
-            key={plan.id}
-            label={`${plan.name} - ₹${plan.price}`}
-            value={plan.id}
-          />
-
-           ))}
-      </Picker> */}
-
-
+        <Text style={[styles.label, { color: isDarkMode ? '#fff' : '#181818' }]}>Select Gym Plan</Text>
         <Picker
           selectedValue={selectedPlan?.id || ''}
-          style={styles.picker}
+          style={[styles.picker, { backgroundColor: isDarkMode ? '#232323' : '#f5f5f5', color: isDarkMode ? '#fff' : '#181818' }]}
           onValueChange={(itemValue) => {
             const plan = plans.find(p => p.id === itemValue);
             setSelectedPlan(plan);
-            handleChange('gymPlan', plan?.name || ''); // Save plan name in form
-            handleChange('gymPlanduration', plan?.duration || ''); // Save plan name in form
+            handleChange('gymPlan', plan?.name || '');
+            handleChange('gymPlanduration', plan?.duration ? plan.duration : 30);
           }}
         >
           <Picker.Item label="-- Select Plan --" value="" />
@@ -642,23 +685,29 @@ await updateFinancialSummary(
           ))}
         </Picker>
 
+        {/* Show plan price if selected */}
+        {selectedPlan && selectedPlan.price && (
+          <Text style={{ marginBottom: 8, color: isDarkMode ? '#fff' : '#181818' }}>
+            Plan Price: ₹{selectedPlan.price}  |  Duration: {selectedPlan.duration} days
+          </Text>
+        )}
 
-        <TextInput placeholder="Admission Fees" placeholderTextColor={colors.pholder} keyboardType="numeric" value={form.admissionFee} onChangeText={text => handleChange('admissionFee', text)} style={styles.input} />
-        <TextInput placeholder="Paid Amount" placeholderTextColor={colors.pholder} keyboardType="numeric" value={form.paidAmount} onChangeText={text => handleChange('paidAmount', text)} style={styles.input} />
+        <TextInput placeholder="Admission Fees" placeholderTextColor={isDarkMode ? '#aaa' : colors.pholder} keyboardType="numeric" value={form.admissionFee} onChangeText={text => handleChange('admissionFee', text)} style={[styles.input, { backgroundColor: isDarkMode ? '#232323' : '#f5f5f5', color: isDarkMode ? '#fff' : '#181818', borderColor: isDarkMode ? '#333' : '#ccc' }]} />
+        <TextInput placeholder="Paid Amount" placeholderTextColor={isDarkMode ? '#aaa' : colors.pholder} keyboardType="numeric" value={form.paidAmount} onChangeText={text => handleChange('paidAmount', text)} style={[styles.input, { backgroundColor: isDarkMode ? '#232323' : '#f5f5f5', color: isDarkMode ? '#fff' : '#181818', borderColor: isDarkMode ? '#333' : '#ccc' }]} />
         {/* <TextInput placeholder="Dues" placeholderTextColor={colors.pholder} keyboardType="numeric" value={form.dues} onChangeText={text => handleChange('dues', text)} style={styles.input} /> */}
-        <Text style={styles.label}>Dues Amount</Text>
+        <Text style={[styles.label, { color: isDarkMode ? '#fff' : '#181818' }]}>Dues Amount</Text>
         <TextInput
           placeholder="Dues"
-          placeholderTextColor={colors.pholder}
+          placeholderTextColor={isDarkMode ? '#aaa' : colors.pholder}
           keyboardType="numeric"
           value={form.dues}
           editable={false}
-          style={[styles.input]}
+          style={[styles.input, { backgroundColor: isDarkMode ? '#232323' : '#f5f5f5', color: isDarkMode ? '#fff' : '#181818', borderColor: isDarkMode ? '#333' : '#ccc' }]}
         />
 
 
-        <Text style={styles.label}>Select Joining Date</Text>
-        <Button backgroundColor={colors.gwhite} color={colors.lgrey} style={styles.pickstyle} title={form.joiningDate.toDateString()} onPress={() => setShowJoinPicker(true)} />
+        <Text style={[styles.label, { color: isDarkMode ? '#fff' : '#181818' }]}>Select Joining Date</Text>
+        <Button backgroundColor={isDarkMode ? '#232323' : colors.gwhite} color={isDarkMode ? '#fff' : colors.lgrey} style={[styles.pickstyle, { backgroundColor: isDarkMode ? '#232323' : '#f5f5f5', color: isDarkMode ? '#fff' : '#181818' }]} title={form.joiningDate.toDateString()} onPress={() => setShowJoinPicker(true)} />
         {showJoinPicker && (
           <DateTimePicker
             value={form.joiningDate}
@@ -671,32 +720,41 @@ await updateFinancialSummary(
           />
         )}
 
-        <Text style={styles.label}>Payment Method</Text>
-        <Picker selectedValue={form.paymentMethod} onValueChange={value => handleChange('paymentMethod', value)} style={styles.picker}>
+        <Text style={[styles.label, { color: isDarkMode ? '#fff' : '#181818' }]}>Payment Method</Text>
+        <Picker selectedValue={form.paymentMethod} onValueChange={value => handleChange('paymentMethod', value)} style={[styles.picker, { backgroundColor: isDarkMode ? '#232323' : '#f5f5f5', color: isDarkMode ? '#fff' : '#181818' }]}>
           <Picker.Item label="Cash" value="Cash" />
           <Picker.Item label="UPI" value="UPI" />
           <Picker.Item label="Card" value="Card" />
           <Picker.Item label="Other" value="Other" />
         </Picker>
 
-        <TextInput placeholder="Address" placeholderTextColor={colors.pholder} value={form.address} onChangeText={text => handleChange('address', text)} style={styles.input} />
-        <TextInput placeholder="Comments" placeholderTextColor={colors.pholder} value={form.comments} onChangeText={text => handleChange('comments', text)} style={styles.input} />
+        <TextInput placeholder="Address" placeholderTextColor={isDarkMode ? '#aaa' : colors.pholder} value={form.address} onChangeText={text => handleChange('address', text)} style={[styles.input, { backgroundColor: isDarkMode ? '#232323' : '#f5f5f5', color: isDarkMode ? '#fff' : '#181818', borderColor: isDarkMode ? '#333' : '#ccc' }]} />
+        <TextInput placeholder="Comments" placeholderTextColor={isDarkMode ? '#aaa' : colors.pholder} value={form.comments} onChangeText={text => handleChange('comments', text)} style={[styles.input, { backgroundColor: isDarkMode ? '#232323' : '#f5f5f5', color: isDarkMode ? '#fff' : '#181818', borderColor: isDarkMode ? '#333' : '#ccc' }]} />
 
         {/* <TouchableOpacity title="Submit" onPress={handleSubmit} color="#6200ee" /> */}
         <View style={styles.filler}></View>
       </ScrollView>
       {renderModel()}
+      {/* Loader Modal */}
+      <Modal visible={loading} transparent animationType="fade">
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.25)' }}>
+          <View style={{ backgroundColor: isDarkMode ? '#232323' : '#fff', padding: 32, borderRadius: 16, alignItems: 'center', minWidth: 180 }}>
+            <ActivityIndicator size="large" color={isDarkMode ? '#fff' : '#181818'} />
+            <Text style={{ marginTop: 16, color: isDarkMode ? '#fff' : '#181818', fontSize: 16, fontWeight: 'bold' }}>Adding member...</Text>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   )
 }
 
-export default addmember
+export default AddMember
 
 const styles = StyleSheet.create({
   mainbody: {
     flex: 1,
     // justifyContent : 'center',
-    backgroundColor: colors.dblack,
+    backgroundColor: '#fff',
     alignItems: 'center',
     // gap: 20,
   },
@@ -705,7 +763,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     height: moderateScale(60),
     width: '100%',
-    backgroundColor: colors.wblack,
+    backgroundColor: '#fff',
     alignItems: 'center',
     flexDirection: 'row',
     alignItems: 'center'
@@ -724,8 +782,7 @@ const styles = StyleSheet.create({
   navtext: {
     fontSize: moderateScale(18),
     fontWeight: 600,
-    color: colors.gwhite,
-
+    color: '#181818',
   },
   savebox: {
 
@@ -761,9 +818,9 @@ const styles = StyleSheet.create({
     position: 'relative',
     // marginTop : moderateScale(30),
     // color : colors.gwhite,
-
-  },
-  inputbodym: {
+    flex: 1,
+    backgroundColor: '#fff',
+    padding: 16,
     backgroundColor: 'yellow',
     // width: moderateScale(300),
     // height : moderateScale(45),
@@ -798,15 +855,18 @@ const styles = StyleSheet.create({
     width: moderateScale(320),
     // height: '100%',
     // padding: 16,
-    color: colors.lgrey,
-    backgroundColor: colors.dblack,
+    color: '#333',
+    backgroundColor: '#fff',
   },
   title: {
     fontSize: 22,
     fontWeight: 'bold',
     marginBottom: 16,
-    color: colors.gwhite,
+    color: '#111',
     textAlign: 'center',
+    backgroundColor: '#fff',
+    paddingVertical: 8,
+    borderRadius: 8,
   },
   input: {
     borderWidth: 1,
@@ -814,25 +874,25 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 15,
     marginBottom: 12,
-    color: colors.gwhite,
-    backgroundColor: colors.wblack,
+    color: '#181818',
+    backgroundColor: '#f5f5f5',
   },
   label: {
     fontWeight: 'bold',
     marginTop: 12,
-    color: colors.gwhite,
+    color: '#181818',
     // width : moderateScale(100),
   },
   picker: {
-    backgroundColor: colors.wblack,
+    backgroundColor: '#f5f5f5',
     marginBottom: 12,
-    color: colors.pholder,
+    color: '#181818',
     borderRadius: 17,
   },
   pickstyle: {
-    backgroundColor: colors.wblack,
+    backgroundColor: '#f5f5f5',
     marginBottom: 12,
-    color: colors.pholder,
+    color: '#181818',
     borderRadius: 17,
   },
 
@@ -855,7 +915,7 @@ const styles = StyleSheet.create({
     width: moderateScale(120),
     height: moderateScale(120),
     borderRadius: moderateScale(60),
-    backgroundColor: colors.pgreenl,
+    backgroundColor: '#e0f7fa',
     justifyContent: 'flex-end',
     alignItems: 'center',
 
@@ -869,11 +929,11 @@ const styles = StyleSheet.create({
   profileimg: {
     width: moderateScale(120),
     height: moderateScale(120),
-    backgroundColor: colors.pgreenl,
+    backgroundColor: '#e0f7fa',
     borderRadius: moderateScale(60),
     zIndex: 2,
     borderWidth: 3,
-    borderColor: colors.cwhite,
+    borderColor: '#fff',
 
 
 
@@ -883,23 +943,17 @@ const styles = StyleSheet.create({
     height: moderateScale(30),
     borderRadius: moderateScale(10),
     position: 'absolute',
-    // alignContent : "baseline",
     justifyContent: 'center',
     alignItems: "center",
     zIndex: 2,
-    backgroundColor: colors.twhite,
+    backgroundColor: '#fff',
     borderWidth: 2,
-    borderColor: colors.cwhite,
-    // marginLeft: 100,
-    // marginLeft : 10,
+    borderColor: '#e0e0e0',
 
 
   },
   bg: {
-    // width: '100%',
-    // height: '100%',
     justifyContent: 'center',
     alignItems: "center",
-    // borderBottomLeftRadius : moderateScale(50),
   },
 })

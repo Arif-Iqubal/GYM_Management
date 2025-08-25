@@ -46,34 +46,194 @@
 
 // export default profile;
 
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Switch, Modal, Button } from 'react-native';
-import { auth } from '../../config/firebaseconfig'; // Your Firebase config
-import { updateEmail, updatePassword, signOut } from 'firebase/auth';
+
+import { AntDesign, Feather, FontAwesome, Ionicons, MaterialIcons, SimpleLineIcons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { router, useNavigation } from 'expo-router';
-import { FontAwesome, MaterialIcons, Ionicons, Feather } from '@expo/vector-icons';
-import { reload } from 'firebase/auth';
+import { EmailAuthProvider, reauthenticateWithCredential, sendEmailVerification, signOut, updateEmail, updatePassword } from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Animated, Easing, Image, Modal, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import placeholder from '../../assets/images/Avatar/man3.png';
+import { auth, db } from '../../config/firebaseconfig';
+import { useTheme } from '../../context/ThemeContext';
+import { uploadFileToCloudinary } from '../../services/imageService';
 
 
-import { reauthenticateWithCredential, EmailAuthProvider, sendEmailVerification } from 'firebase/auth';
-// import { Modal, Alert } from 'react-native';
 
 export default function ProfileScreen() {
-
-  const user = auth.currentUser;
-
-  const [showEmailModal, setShowEmailModal] = useState(false);
-  const [adminPassword, setAdminPassword] = useState('');
+  // ...existing code...
+  // For email update modal
+  // Email update modal state
   const [newEmail, setNewEmail] = useState('');
-  const [passwordPromptVisible, setPasswordPromptVisible] = useState(false);
+  const [emailUpdatePassword, setEmailUpdatePassword] = useState('');
+  const [emailUpdateLoading, setEmailUpdateLoading] = useState(false);
+  const [image, setImage] = useState(null);
+  const [loadingImage, setLoadingImage] = useState(false);
+  const [openModal, setOpenModal] = useState(false);
+  const [adminDoc, setAdminDoc] = useState(null);
+  // Animated value for theme transition
+  const themeAnim = React.useRef(new Animated.Value(0)).current;
+  const user = auth.currentUser;
+  const [showEmailModal, setShowEmailModal] = React.useState(false);
+  const [adminPassword, setAdminPassword] = React.useState('');
+  const [passwordPromptVisible, setPasswordPromptVisible] = React.useState(false);
+  const [showPasswordModal, setShowPasswordModal] = React.useState(false);
+  const [showNewPasswordModal, setShowNewPasswordModal] = React.useState(false);
+  const [currentPassword, setCurrentPassword] = React.useState('');
+  const [newPasswordInput, setNewPasswordInput] = React.useState('');
 
+  // Use global theme context
+  const { isDarkMode, toggleTheme } = useTheme();
 
+  // Fetch admin profile (with image) on mount
+  useEffect(() => {
+    const fetchAdmin = async () => {
+      try {
+        const uid = auth.currentUser?.uid;
+        if (!uid) return;
+        const ref = doc(db, 'admin', uid);
+        const snap = await getDoc(ref);
+        if (snap.exists()) {
+          setAdminDoc(snap.data());
+          setImage(snap.data().imageUrl || null);
+        }
+      } catch (e) {
+        setAdminDoc(null);
+      }
+    };
+    fetchAdmin();
+  }, []);
 
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [showNewPasswordModal, setShowNewPasswordModal] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPasswordInput, setNewPasswordInput] = useState('');
+  // Image picker logic (from addmember)
+  const uploadImage = async (mode) => {
+    try {
+      let result = {};
+      if (mode === 'gallery') {
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+        result = await ImagePicker.launchImageLibraryAsync({
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 1,
+        });
+        if (!result.canceled) {
+          await saveImage(result.assets[0].uri);
+        }
+      } else {
+        await ImagePicker.requestCameraPermissionsAsync();
+        result = await ImagePicker.launchCameraAsync({
+          cameraType: ImagePicker.CameraType.front,
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 1,
+        });
+        if (!result.canceled) {
+          await saveImage(result.assets[0].uri);
+        }
+      }
+    } catch (error) {
+      alert('Error uploading image: ' + error.message);
+      setOpenModal(false);
+    }
+  };
 
+  const saveImage = async (imgUri) => {
+    try {
+      setLoadingImage(true);
+      setImage({ uri: imgUri });
+      // Upload to Cloudinary
+      const uploadRes = await uploadFileToCloudinary({ uri: imgUri }, 'admin_profile');
+      if (uploadRes.success && uploadRes.data) {
+        // Save to Firestore
+        const uid = auth.currentUser?.uid;
+        if (uid) {
+          await setDoc(doc(db, 'admin', uid), { ...(adminDoc || {}), imageUrl: uploadRes.data }, { merge: true });
+          setImage(uploadRes.data);
+        }
+      } else {
+        Alert.alert('Image Upload Failed', uploadRes.msg || 'Try again.');
+      }
+      setLoadingImage(false);
+      setOpenModal(false);
+    } catch (error) {
+      setLoadingImage(false);
+      setOpenModal(false);
+      Alert.alert('Error', error.message || 'Failed to save image');
+    }
+  };
+
+  const removeImage = async () => {
+    try {
+      setImage(null);
+      const uid = auth.currentUser?.uid;
+      if (uid) {
+        await setDoc(doc(db, 'admin', uid), { ...(adminDoc || {}), imageUrl: null }, { merge: true });
+      }
+      setOpenModal(false);
+    } catch (e) {
+      setOpenModal(false);
+    }
+  };
+
+  // Animate theme transition
+  React.useEffect(() => {
+    Animated.timing(themeAnim, {
+      toValue: isDarkMode ? 1 : 0,
+      duration: 400,
+      easing: Easing.inOut(Easing.ease),
+      useNativeDriver: false,
+    }).start();
+  }, [isDarkMode]);
+
+  // Animated colors for smooth transition
+  const bgColor = themeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#fff', '#181818']
+  });
+  const headerColor = themeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#181818', '#fff']
+  });
+  const cardBg = themeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#f9f9f9', '#232323']
+  });
+  const labelColor = themeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#444', '#ccc']
+  });
+  const inputBg = themeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#eee', '#222']
+  });
+  const inputColor = themeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#181818', '#fff']
+  });
+  const btnBg = themeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#2196F3', '#007AFF']
+  });
+  const optionTextColor = themeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#333', '#fff']
+  });
+  const emailRowBg = themeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#f0f0f0', '#232323']
+  });
+  const emailTextColor = themeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#333', '#fff']
+  });
+  const modalCardBg = themeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#fff', '#232323']
+  });
+  const modalTitleColor = themeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#181818', '#fff']
+  });
 
   const handleStartPasswordChange = () => {
     setShowPasswordModal(true);
@@ -112,12 +272,14 @@ export default function ProfileScreen() {
     setPasswordPromptVisible(true);
   };
 
+  // Remove emailCredential logic, use password in email modal
   const verifyAdminPassword = async () => {
     try {
       const credential = EmailAuthProvider.credential(user.email, adminPassword);
       await reauthenticateWithCredential(user, credential);
       setPasswordPromptVisible(false);
       setShowEmailModal(true);
+      setAdminPassword('');
     } catch (error) {
       Alert.alert("Auth Failed", "Incorrect password. Try again.");
     }
@@ -155,68 +317,40 @@ export default function ProfileScreen() {
   //   }
   // };
 
+  // Completely new email update logic
   const handleUpdateEmail = async () => {
+    setEmailUpdateLoading(true);
     try {
       const user = auth.currentUser;
-      await reload(user); // Always reload user state
-
-      // Ensure the current email is verified
-      if (!user.emailVerified) {
-        await sendEmailVerification(user);
-        Alert.alert("Current Email Not Verified", "We've sent you a verification email. Please verify your current email first.");
-        return;
-      }
-      console.log("running");
-      // Step 1: Update email
+      const credential = EmailAuthProvider.credential(user.email, emailUpdatePassword);
+      await reauthenticateWithCredential(user, credential);
       await updateEmail(user, newEmail);
-      console.log("still_running");
-
-      // Step 2: Send verification email to new email
-      await sendEmailVerification(user);
-
-      Alert.alert(
-        "Email Changed",
-        "A verification email has been sent to your new address. Please verify it and log in again."
-      );
-
-      await signOut(auth);
-      router.replace("../login");
-      setShowEmailModal(false);
-
-
-    } catch (error) {
-      console.log("Not running");
-      switch (error.code) {
-        case "auth/requires-recent-login":
-          console.error(
-            "Recent login required. Please reauthenticate the user before updating the email."
-          );
-          break;
-
-        case "auth/invalid-email":
-          console.error("The provided email is invalid.");
-          break;
-
-        case "auth/email-already-in-use":
-          console.error("The email is already in use by another account.");
-          break;
-
-        default:
-          console.error("Error updating email:", error.message);
-          setShowEmailModal(false);
-          break;
+      const uid = user?.uid;
+      if (uid) {
+        await setDoc(doc(db, 'admin', uid), { ...(adminDoc || {}), email: newEmail }, { merge: true });
       }
+      await sendEmailVerification(auth.currentUser);
+      Alert.alert('Success', 'Email updated! Please verify your new email before logging in.');
+      setShowEmailModal(false);
+      setAdminDoc((prev) => ({ ...(prev || {}), email: newEmail }));
+      setEmailUpdatePassword('');
+      setEmailUpdateLoading(false);
+      await signOut(auth);
+      router.replace('/(auth)/login');
+    } catch (error) {
+      console.log('Email update error:', error);
+      Alert.alert('Email Update Error', error.message || 'Error updating email.');
+      setEmailUpdateLoading(false);
     }
   };
 
 
 
 
-  const navigation = useNavigation();
 
-  const [email, setEmail] = useState(user?.email || '');
-  const [password, setPassword] = useState('');
-  const [themeDark, setThemeDark] = useState(false);
+  const navigation = useNavigation();
+  const [email, setEmail] = React.useState(user?.email || '');
+  const [password, setPassword] = React.useState('');
 
   // const handleUpdateEmail = async () => {
   //   try {
@@ -249,7 +383,10 @@ export default function ProfileScreen() {
       <Modal visible={showPasswordModal} transparent animationType="fade">
         <View style={styles.modalBackground}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Enter Current Password</Text>
+            <TouchableOpacity onPress={() => setShowPasswordModal(false)} style={{ position: 'absolute', top: 10, right: 10, zIndex: 10 }}>
+              <Text style={{ fontSize: 16, color: 'grey' }}>✕</Text>
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { marginTop: 20 }]}>Enter Current Password</Text>
             <TextInput
               secureTextEntry
               style={styles.input}
@@ -271,7 +408,10 @@ export default function ProfileScreen() {
       <Modal visible={showNewPasswordModal} transparent animationType="fade">
         <View style={styles.modalBackground}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Enter New Password</Text>
+            <TouchableOpacity onPress={() => setShowNewPasswordModal(false)} style={{ position: 'absolute', top: 10, right: 10, zIndex: 10 }}>
+              <Text style={{ fontSize: 16, color: 'grey' }}>✕</Text>
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { marginTop: 20 }]}>Enter New Password</Text>
             <TextInput
               secureTextEntry
               style={styles.input}
@@ -282,8 +422,6 @@ export default function ProfileScreen() {
             <TouchableOpacity style={styles.btn} onPress={handleUpdatePassword}>
               <Text style={styles.btnText}>Update Password</Text>
             </TouchableOpacity>
-                        <Button title="Cancel" color="gray" onPress={() => renderNewPasswordModal(false)} />
-
           </View>
         </View>
       </Modal>
@@ -316,11 +454,13 @@ export default function ProfileScreen() {
 
   function renderModel1() {
     return (
-
       <Modal visible={showEmailModal} transparent animationType="fade">
         <View style={styles.modalBackground}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Enter New Email</Text>
+            <TouchableOpacity onPress={() => setShowEmailModal(false)} style={{ position: 'absolute', top: 10, right: 10, zIndex: 10 }}>
+              <Text style={{ fontSize: 16, color: 'grey' }}>✕</Text>
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { marginTop: 20 }]}>Update Email</Text>
             <TextInput
               autoCapitalize="none"
               style={styles.input}
@@ -328,85 +468,168 @@ export default function ProfileScreen() {
               onChangeText={setNewEmail}
               value={newEmail}
             />
-            <TouchableOpacity style={styles.btn} onPress={handleUpdateEmail}>
-              <Text style={styles.btnText}>Submit</Text>
+            <TextInput
+              secureTextEntry
+              style={styles.input}
+              placeholder="Enter your password"
+              value={emailUpdatePassword}
+              onChangeText={setEmailUpdatePassword}
+            />
+            <TouchableOpacity style={styles.btn} onPress={handleUpdateEmail} disabled={emailUpdateLoading}>
+              {emailUpdateLoading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.btnText}>Update Email</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
-    )
+    );
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.header}>Profile</Text>
+    <Animated.View style={[styles.container, { backgroundColor: bgColor }]}> 
+      <Animated.Text style={[styles.header, { color: headerColor }]}>Profile</Animated.Text>
+
+      {/* Profile Image Section */}
+      <View style={{ alignItems: 'center', marginBottom: 20 }}>
+        <View style={{ position: 'relative' }}>
+          <Image
+            source={
+              image && typeof image === 'object' && image.uri
+                ? { uri: image.uri }
+                : typeof image === 'string'
+                ? { uri: image }
+                : placeholder
+            }
+            style={{ width: 120, height: 120, borderRadius: 60, borderWidth: 3, borderColor: '#fff', backgroundColor: '#e0f7fa' }}
+            resizeMode="cover"
+          />
+          <TouchableOpacity
+            onPress={() => setOpenModal(true)}
+            activeOpacity={0.7}
+            style={{ position: 'absolute', bottom: 0, right: 0, backgroundColor: '#fff', borderRadius: 15, padding: 6, borderWidth: 2, borderColor: '#e0e0e0' }}
+          >
+            <FontAwesome name="camera" size={18} color={isDarkMode ? '#181818' : '#181818'} />
+          </TouchableOpacity>
+        </View>
+        {loadingImage && <ActivityIndicator style={{ marginTop: 10 }} size="small" color="#2196F3" />}
+      </View>
+
+      {/* Image Picker Modal */}
+      <Modal visible={openModal} animationType="fade" transparent={true}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)' }}>
+          <View style={{ justifyContent: 'space-evenly', alignItems: 'center', height: 150, width: 300, backgroundColor: isDarkMode ? '#232323' : '#fff', borderRadius: 20 }} >
+            <View style={{ width: '100%', height: 80, flexDirection: 'row', justifyContent: 'space-evenly', alignItems: 'center' }}>
+              <TouchableOpacity activeOpacity={0.5} onPress={() => uploadImage()} style={{ backgroundColor: '#fff', width: 60, height: 60, justifyContent: 'center', alignItems: 'center', borderRadius: 15 }}>
+                <SimpleLineIcons name="camera" size={30} color="black" />
+                <Text style={{ fontSize: 10, fontWeight: '600' }}>Camera</Text>
+              </TouchableOpacity>
+              <TouchableOpacity activeOpacity={0.5} onPress={() => uploadImage('gallery')} style={{ backgroundColor: '#fff', width: 60, height: 60, justifyContent: 'center', alignItems: 'center', borderRadius: 15 }}>
+                <AntDesign name="picture" size={30} color="black" />
+                <Text style={{ fontSize: 10, fontWeight: '600' }}>Gallery</Text>
+              </TouchableOpacity>
+              <TouchableOpacity activeOpacity={0.5} onPress={removeImage} style={{ backgroundColor: '#fff', width: 60, height: 60, justifyContent: 'center', alignItems: 'center', borderRadius: 15 }}>
+                <AntDesign name="delete" size={30} color="black" />
+                <Text style={{ fontSize: 10, fontWeight: '600' }}>Remove</Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity activeOpacity={0.5} onPress={() => setOpenModal(false)}>
+              <Text style={{ width: 80, textAlign: 'center', fontSize: 15, color: 'grey' }}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Email Update */}
-      {/* <View style={styles.card}>
-        <Text style={styles.label}>Email</Text>
-        <TextInput
-          style={styles.input}
-          value={email}
-          autoCapitalize="none"
-          onChangeText={setEmail}
-        />
-        <TouchableOpacity style={styles.btn} onPress={handleUpdateEmail}>
-          <Text style={styles.btnText}>Update Email</Text>
-        </TouchableOpacity>
-      </View> */}
-      <View style={styles.emailRow}>
-        <FontAwesome name="envelope" size={20} color="#333" />
-        <Text style={styles.emailText}>{user?.email}</Text>
+      <Animated.View style={[styles.emailRow, { backgroundColor: emailRowBg }]}> 
+        <FontAwesome name="envelope" size={20} color={isDarkMode ? '#fff' : '#333'} />
+        <Animated.Text style={[styles.emailText, { color: emailTextColor }]}>{user?.email}</Animated.Text>
+        {/* Send verification icon and check verification if not verified */}
+        {!user?.emailVerified && (
+          <>
+            <TouchableOpacity
+              onPress={async () => {
+                try {
+                  await user.sendEmailVerification();
+                  Alert.alert('Verification Email Sent', 'Please check your inbox.');
+                } catch (e) {
+                  Alert.alert('Error', e.message || 'Failed to send verification email.');
+                }
+              }}
+              style={{ marginRight: 10 }}
+              accessibilityLabel="Send verification email"
+            >
+              <MaterialIcons name="mark-email-unread" size={22} color="#007AFF" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={async () => {
+                try {
+                  await user.reload();
+                  if (user.emailVerified) {
+                    Alert.alert('Success', 'Your email is now verified!');
+                  } else {
+                    Alert.alert('Not Verified', 'Your email is still not verified. Please check your inbox and click the verification link.');
+                  }
+                } catch (e) {
+                  Alert.alert('Error', e.message || 'Failed to check verification.');
+                }
+              }}
+              style={{ marginRight: 10 }}
+              accessibilityLabel="Check verification"
+            >
+              <MaterialIcons name="refresh" size={22} color="#007AFF" />
+            </TouchableOpacity>
+          </>
+        )}
         <TouchableOpacity onPress={handleStartEmailEdit}>
           <Feather name="edit" size={20} color="#007AFF" />
         </TouchableOpacity>
-      </View>
-
+      </Animated.View>
 
       {/* Password Change */}
       <TouchableOpacity style={styles.option} onPress={handleStartPasswordChange}>
-        <Feather name="lock" size={24} color="#555" />
-        <Text style={styles.optionText}>Change Password</Text>
+        <Feather name="lock" size={24} color={isDarkMode ? '#fff' : '#555'} />
+        <Animated.Text style={[styles.optionText, { color: optionTextColor }]}>Change Password</Animated.Text>
       </TouchableOpacity>
-
 
       {/* Plan Configuration */}
       <TouchableOpacity
         style={styles.option}
         onPress={() => router.push('../addplans')}>
-        <FontAwesome name="cogs" size={24} color="#555" />
-        <Text style={styles.optionText}>Plan Configuration</Text>
+        <FontAwesome name="cogs" size={24} color={isDarkMode ? '#fff' : '#555'} />
+        <Animated.Text style={[styles.optionText, { color: optionTextColor }]}>Plan Configuration</Animated.Text>
       </TouchableOpacity>
       <TouchableOpacity
         style={styles.option}
         onPress={() => router.push('../charts')}>
-        <FontAwesome name="cogs" size={24} color="#555" />
-        <Text style={styles.optionText}>Charts</Text>
+        <FontAwesome name="cogs" size={24} color={isDarkMode ? '#fff' : '#555'} />
+        <Animated.Text style={[styles.optionText, { color: optionTextColor }]}>Charts</Animated.Text>
       </TouchableOpacity>
-
-      {/* Theme Toggle */}
-      <View style={styles.option}>
-        <Feather name="sun" size={24} color="#555" />
-        <Text style={styles.optionText}>Dark Mode</Text>
-        <Switch value={themeDark} onValueChange={setThemeDark} />
-      </View>
 
       {/* Notifications */}
       <TouchableOpacity style={styles.option}>
-        <Ionicons name="notifications-outline" size={24} color="#555" />
-        <Text style={styles.optionText}>Notifications</Text>
+        <Ionicons name="notifications-outline" size={24} color={isDarkMode ? '#fff' : '#555'} />
+        <Animated.Text style={[styles.optionText, { color: optionTextColor }]}>Notifications</Animated.Text>
       </TouchableOpacity>
+
+      {/* Theme Toggle */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+        <Animated.Text style={{ color: headerColor, fontSize: 16, marginRight: 8 }}>Dark Mode</Animated.Text>
+        <Switch value={isDarkMode} onValueChange={toggleTheme} />
+      </View>
 
       {/* Logout */}
       <TouchableOpacity style={[styles.option, { marginTop: 20 }]} onPress={handleLogout}>
         <MaterialIcons name="logout" size={24} color="red" />
-        <Text style={[styles.optionText, { color: 'red' }]}>Logout</Text>
+        <Animated.Text style={[styles.optionText, { color: 'red' }]}>Logout</Animated.Text>
       </TouchableOpacity>
       {renderModel()}
       {renderModel1()}
       {renderPasswordVerifyModal()}
-{renderNewPasswordModal()}
-    </View>
+      {renderNewPasswordModal()}
+    </Animated.View>
   );
 }
 const styles = StyleSheet.create({
