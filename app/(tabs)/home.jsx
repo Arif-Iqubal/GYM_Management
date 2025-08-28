@@ -32,14 +32,19 @@ const screenWidth = Dimensions.get('window').width;
 
 
 
-function DonutChart({ data, total, label, isDarkMode }) {
-  // data: [{ value, color, label }]
-  const size = 180;
-  const strokeWidth = 22;
+function DonutChart({ income, dues, totalMembers, paidMembers, isDarkMode }) {
+  const size = 200;
+  const strokeWidth = 25;
   const radius = (size - strokeWidth) / 2;
   const cx = size / 2;
   const cy = size / 2;
-  let startAngle = 0;
+  
+  // Calculate total revenue and percentages
+  const totalRevenue = income + dues;
+  const incomePercentage = totalRevenue > 0 ? (income / totalRevenue) * 100 : 0;
+  const duesPercentage = totalRevenue > 0 ? (dues / totalRevenue) * 100 : 0;
+  const paidPercentage = totalMembers > 0 ? (paidMembers / totalMembers) * 100 : 0;
+  
   // Helper to describe arc
   function describeArc(cx, cy, r, startAngle, endAngle) {
     const polarToCartesian = (cx, cy, r, angle) => {
@@ -57,57 +62,149 @@ function DonutChart({ data, total, label, isDarkMode }) {
       "A", r, r, 0, arcSweep, 1, end.x, end.y
     ].join(" ");
   }
-  // Draw arcs for each segment
+
+  // Draw arcs for income and dues
   let arcs = [];
   let currentAngle = 0;
-  data.forEach((segment, i) => {
-    const angle = (segment.value / total) * 360;
-    const endAngle = currentAngle + angle;
-    if (segment.value > 0) {
-      arcs.push(
-        <Path
-          key={i}
-          d={describeArc(cx, cy, radius, currentAngle, endAngle)}
-          stroke={segment.color}
-          strokeWidth={strokeWidth}
-          fill="none"
-          strokeLinecap="round"
-        />
-      );
-    }
-    currentAngle = endAngle;
-  });
-  // Center label color
+  
+  // Income arc (blue)
+  if (income > 0) {
+    const incomeAngle = (income / totalRevenue) * 360;
+    arcs.push(
+      <Path
+        key="income"
+        d={describeArc(cx, cy, radius, currentAngle, currentAngle + incomeAngle)}
+        stroke="#4285F4"
+        strokeWidth={strokeWidth}
+        fill="none"
+        strokeLinecap="round"
+      />
+    );
+    currentAngle += incomeAngle;
+  }
+  
+  // Dues arc (light gray)
+  if (dues > 0) {
+    const duesAngle = (dues / totalRevenue) * 360;
+    arcs.push(
+      <Path
+        key="dues"
+        d={describeArc(cx, cy, radius, currentAngle, currentAngle + duesAngle)}
+        stroke="#E0E0E0"
+        strokeWidth={strokeWidth}
+        fill="none"
+        strokeLinecap="round"
+      />
+    );
+  }
+
+  // Center label colors
   const labelColor = isDarkMode ? '#fff' : '#181818';
-  const subLabelColor = isDarkMode ? '#aaa' : '#555';
+  const subLabelColor = isDarkMode ? '#aaa' : '#666';
+  const greenColor = '#4CAF50';
+
   return (
     <View style={{ alignItems: 'center' }}>
       <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <G>
+          {/* Background circle for empty state */}
+          {totalRevenue === 0 && (
+            <Path
+              d={describeArc(cx, cy, radius, 0, 360)}
+              stroke="#E0E0E0"
+              strokeWidth={strokeWidth}
+              fill="none"
+              strokeLinecap="round"
+            />
+          )}
           {/* Donut arcs */}
           {arcs}
-          {/* Center total label */}
+          {/* Center income amount */}
           <SvgText
             x={cx}
-            y={cy - 5}
+            y={cy - 8}
             textAnchor="middle"
             fontWeight="bold"
-            fontSize="26"
+            fontSize="32"
             fill={labelColor}
           >
-            {total.toLocaleString()}
+            ₹{income.toLocaleString()}
           </SvgText>
           <SvgText
             x={cx}
-            y={cy + 20}
+            y={cy + 15}
+            textAnchor="middle"
+            fontSize="12"
+            fill={greenColor}
+          >
+            ↑ {incomePercentage.toFixed(1)}%
+          </SvgText>
+          <SvgText
+            x={cx}
+            y={cy + 32}
             textAnchor="middle"
             fontSize="14"
             fill={subLabelColor}
           >
-            {label}
+            Income
           </SvgText>
         </G>
       </Svg>
+      
+      {/* Legend and Statistics */}
+      <View style={{ marginTop: 20, alignItems: 'center' }}>
+        {/* Revenue Legend */}
+        <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 15 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: 12 }}>
+            <View style={{ 
+              width: 12, 
+              height: 12, 
+              borderRadius: 6, 
+              backgroundColor: '#4285F4', 
+              marginRight: 8 
+            }} />
+            <Text style={{ color: labelColor, fontSize: 14, fontWeight: '500' }}>
+              Income
+            </Text>
+            <Text style={{ color: subLabelColor, fontSize: 13, marginLeft: 4 }}>
+              {totalRevenue > 0 ? incomePercentage.toFixed(1) : 0}% (₹{income.toLocaleString()})
+            </Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: 12 }}>
+            <View style={{ 
+              width: 12, 
+              height: 12, 
+              borderRadius: 6, 
+              backgroundColor: '#E0E0E0', 
+              marginRight: 8 
+            }} />
+            <Text style={{ color: labelColor, fontSize: 14, fontWeight: '500' }}>
+              Dues
+            </Text>
+            <Text style={{ color: subLabelColor, fontSize: 13, marginLeft: 4 }}>
+              {totalRevenue > 0 ? duesPercentage.toFixed(1) : 0}% (₹{dues.toLocaleString()})
+            </Text>
+          </View>
+        </View>
+        
+        {/* Member Statistics */}
+        <View style={{ alignItems: 'center' }}>
+          <Text style={{ 
+            fontSize: 16, 
+            fontWeight: '600', 
+            color: labelColor,
+            marginBottom: 4 
+          }}>
+            {paidPercentage.toFixed(1)}% members paid
+          </Text>
+          <Text style={{ 
+            fontSize: 14, 
+            color: subLabelColor 
+          }}>
+            {paidMembers} paid • {totalMembers - paidMembers} dues remaining
+          </Text>
+        </View>
+      </View>
     </View>
   );
 }
@@ -118,6 +215,8 @@ const home = () => {
   const [dues, setDues] = useState(0);
   const [transactions, setTransactions] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [totalMembers, setTotalMembers] = useState(0);
+  const [paidMembers, setPaidMembers] = useState(0);
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const today = new Date();
   const month = monthNames[today.getMonth()];
@@ -200,6 +299,58 @@ const home = () => {
     }
   };
 
+  const fetchMemberStatistics = async () => {
+    try {
+      const today = new Date();
+      const currentMonth = today.getMonth() + 1;
+      const currentYear = today.getFullYear();
+      
+      // Get all members
+      const membersRef = collectionGroup(db, 'members');
+      const membersSnapshot = await getDocs(membersRef);
+      
+      let totalMembersCount = 0;
+      let paidMembersCount = 0;
+      
+      for (const memberDoc of membersSnapshot.docs) {
+        const memberData = memberDoc.data();
+        totalMembersCount++;
+        
+        // Check if member has paid this month by looking at transactions
+        const memberTransactionsRef = query(
+          collectionGroup(db, 'transactions'),
+          orderBy('paymentDate', 'desc'),
+          limit(1)
+        );
+        
+        try {
+          const transactionsSnapshot = await getDocs(memberTransactionsRef);
+          for (const txnDoc of transactionsSnapshot.docs) {
+            const txnData = txnDoc.data();
+            const paymentDate = new Date(txnData.paymentDate);
+            
+            if (paymentDate.getMonth() + 1 === currentMonth && 
+                paymentDate.getFullYear() === currentYear &&
+                txnDoc.ref.path.includes(memberDoc.id)) {
+              paidMembersCount++;
+              break;
+            }
+          }
+        } catch (err) {
+          console.log("Error checking member transactions:", err.message);
+        }
+      }
+      
+      setTotalMembers(totalMembersCount);
+      setPaidMembers(paidMembersCount);
+      
+    } catch (err) {
+      console.error("Error loading member statistics:", err.message);
+      setTotalMembers(0);
+      setPaidMembers(0);
+    }
+  };
+
 
 
 
@@ -227,22 +378,7 @@ const home = () => {
   //   fetchData();
   // }, []);
 
-  const chartData = [
-    {
-      name: 'Income',
-      amount: income,
-      color: isDarkMode ? '#222' : '#181818', // dark/light black
-      legendFontColor: isDarkMode ? '#fff' : '#181818',
-      legendFontSize: 15,
-    },
-    {
-      name: 'Dues',
-      amount: dues,
-      color: isDarkMode ? '#444' : '#333', // lighter black for contrast
-      legendFontColor: isDarkMode ? '#fff' : '#181818',
-      legendFontSize: 15,
-    },
-  ];
+
 
 
 
@@ -293,9 +429,10 @@ const home = () => {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      // Refresh both summary and transactions
+      // Refresh summary, transactions, and member statistics
       await Promise.all([
         fetchCurrentMonthSummary(),
+        fetchMemberStatistics(),
         fetchRecentTransactions(adminUID).then(setTransactions)
       ]);
     } catch (error) {
@@ -348,33 +485,15 @@ const home = () => {
             <Text style={[styles.chartTitle, { color: isDarkMode ? '#fff' : '#181818' }]}>Revenue</Text>
             <View style={[styles.finance_box_in, { backgroundColor: isDarkMode ? '#181818' : '#fff', borderColor: isDarkMode ? '#333' : '#e0e0e0' }]}>
               <Text style={[styles.chartdate, { color: isDarkMode ? '#fff' : '#181818' }]}>{month}</Text>
-              {/* Pie Chart */}
-              <View style={{ alignItems: 'center', justifyContent: 'flex-start', height: 200, width: screenWidth * 0.8 }}>
+              {/* Donut Chart */}
+              <View style={{ alignItems: 'center', justifyContent: 'center', height: 320, width: screenWidth * 0.8 }}>
                 <DonutChart
-                  data={[
-                    { value: income, color: isDarkMode ? '#fff' : '#181818', label: 'Paid' },
-                    { value: dues, color: isDarkMode ? '#888' : '#bbb', label: 'Unpaid' },
-                    { value: Math.max(0,income ), color: isDarkMode ? '#444' : '#e0e0e0', label: 'New' },
-                  ]}
-                  total={income + dues + Math.max(0, (income + dues) * 0.3)}
-                  label={"Total Revenue"}
+                  income={income}
+                  dues={dues}
+                  totalMembers={totalMembers}
+                  paidMembers={paidMembers}
                   isDarkMode={isDarkMode}
                 />
-                {/* Legend */}
-                <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 10 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: 8 }}>
-                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: isDarkMode ? '#fff' : '#181818', marginRight: 6 }} />
-                    <Text style={{ color: isDarkMode ? '#fff' : '#181818', fontSize: 13 }}>Paid {Math.round((income / (income + dues + Math.max(0, (income + dues) * 0.3))) * 100) || 0}%</Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: 8 }}>
-                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: isDarkMode ? '#888' : '#bbb', marginRight: 6 }} />
-                    <Text style={{ color: isDarkMode ? '#fff' : '#181818', fontSize: 13 }}>Unpaid {Math.round((dues / (income + dues + Math.max(0, (income + dues) * 0.3))) * 100) || 0}%</Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: 8 }}>
-                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: isDarkMode ? '#444' : '#e0e0e0', marginRight: 6 }} />
-                    <Text style={{ color: isDarkMode ? '#fff' : '#181818', fontSize: 13 }}>New 30%</Text>
-                  </View>
-                </View>
               </View>
               {/* Income & Dues */}
               {/* <View style={styles.amountInfo_box}>
@@ -461,7 +580,7 @@ const styles = StyleSheet.create({
   finance_box: {
     backgroundColor: '#fff',
     width: '100%',
-    height: moderateScale(360),
+    height: moderateScale(440),
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -469,8 +588,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#e0e0e0',
-    width: moderateScale(280),
-    height: moderateScale(280),
+    width: moderateScale(320),
+    height: moderateScale(380),
     borderRadius: moderateScale(13),
   },
   chartTitle: {
