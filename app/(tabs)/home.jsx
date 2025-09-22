@@ -18,12 +18,13 @@ import Svg, { G, Path, Text as SvgText } from 'react-native-svg';
 import { useTheme } from '../../context/ThemeContext';
 
 import { Ionicons } from '@expo/vector-icons';
-import React, { useCallback, useState } from 'react';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { Dimensions, FlatList, Image, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-
 import { db } from '../../config/firebaseconfig'; // your firebase config
 // import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
-import { collectionGroup, doc, getDoc, getDocs, limit, orderBy, query } from 'firebase/firestore';
+import { collectionGroup, doc, getDoc, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { moderateScale } from "react-native-size-matters";
 import { ScrollView } from 'react-native-virtualized-view';
@@ -39,7 +40,6 @@ function DonutChart({ data, total, label, isDarkMode }) {
   const radius = (size - strokeWidth) / 2;
   const cx = size / 2;
   const cy = size / 2;
-  let startAngle = 0;
   // Helper to describe arc
   function describeArc(cx, cy, r, startAngle, endAngle) {
     const polarToCartesian = (cx, cy, r, angle) => {
@@ -57,36 +57,48 @@ function DonutChart({ data, total, label, isDarkMode }) {
       "A", r, r, 0, arcSweep, 1, end.x, end.y
     ].join(" ");
   }
-  // Draw arcs for each segment
-  let arcs = [];
+  // Always draw a faint background ring (track)
+  const trackColor = isDarkMode ? '#333' : '#e0e0e0';
+  const arcs = [];
   let currentAngle = 0;
-  data.forEach((segment, i) => {
-    const angle = (segment.value / total) * 360;
-    const endAngle = currentAngle + angle;
-    if (segment.value > 0) {
-      arcs.push(
-        <Path
-          key={i}
-          d={describeArc(cx, cy, radius, currentAngle, endAngle)}
-          stroke={segment.color}
-          strokeWidth={strokeWidth}
-          fill="none"
-          strokeLinecap="round"
-        />
-      );
-    }
-    currentAngle = endAngle;
-  });
+  // Only draw arcs if total > 0
+  if (total > 0) {
+    data.forEach((segment, i) => {
+      const angle = (segment.value / total) * 360;
+      const endAngle = currentAngle + angle;
+      if (segment.value > 0) {
+        arcs.push(
+          <Path
+            key={i}
+            d={describeArc(cx, cy, radius, currentAngle, endAngle)}
+            stroke={segment.color}
+            strokeWidth={strokeWidth}
+            fill="none"
+            strokeLinecap="round"
+          />
+        );
+      }
+      currentAngle = endAngle;
+    });
+  }
   // Center label color
   const labelColor = isDarkMode ? '#fff' : '#181818';
   const subLabelColor = isDarkMode ? '#aaa' : '#555';
+  // Show income in the center
   return (
     <View style={{ alignItems: 'center' }}>
       <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <G>
+          {/* Always show background track */}
+          <Path
+            d={describeArc(cx, cy, radius, 0, 359.99)}
+            stroke={trackColor}
+            strokeWidth={strokeWidth}
+            fill="none"
+          />
           {/* Donut arcs */}
           {arcs}
-          {/* Center total label */}
+          {/* Center income label */}
           <SvgText
             x={cx}
             y={cy - 5}
@@ -95,7 +107,7 @@ function DonutChart({ data, total, label, isDarkMode }) {
             fontSize="26"
             fill={labelColor}
           >
-            {total.toLocaleString()}
+            {data[0]?.value?.toLocaleString() || 0}
           </SvgText>
           <SvgText
             x={cx}
@@ -104,7 +116,7 @@ function DonutChart({ data, total, label, isDarkMode }) {
             fontSize="14"
             fill={subLabelColor}
           >
-            {label}
+            Income
           </SvgText>
         </G>
       </Svg>
@@ -114,6 +126,7 @@ function DonutChart({ data, total, label, isDarkMode }) {
 
 const home = () => {
   const { isDarkMode, toggleTheme } = useTheme();
+  const router = useRouter();
   const [income, setIncome] = useState(0);
   const [dues, setDues] = useState(0);
   const [transactions, setTransactions] = useState([]);
@@ -121,7 +134,8 @@ const home = () => {
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const today = new Date();
   const month = monthNames[today.getMonth()];
-  const [adminUID, setAdminUID] = useState("ecNCqm8PgxOEgG9S7puVpm2hVZn2");
+  const { auth } = require('../../config/firebaseconfig');
+  const [adminUID, setAdminUID] = useState(auth.currentUser?.uid || "");
 
   // Fetching Current Month Income and Dues
 
@@ -179,11 +193,11 @@ const home = () => {
     try {
       const today = new Date();
       const year = today.getFullYear().toString();
-      const month = String(today.getMonth() + 1).padStart(2, '0'); // e.g. "06"
-
-      const summaryRef = doc(db, 'admin', adminUID, 'financialSummary', year);
+      const month = String(today.getMonth() + 1).padStart(2, '0');
+      const uid = auth.currentUser?.uid;
+      if (!uid) return;
+      const summaryRef = doc(db, 'admin', uid, 'financialSummary', year);
       const docSnap = await getDoc(summaryRef);
-
       if (docSnap.exists()) {
         const data = docSnap.data();
         const currentMonthData = data.monthly?.[month] || { income: 0, dues: 0 };
@@ -227,20 +241,17 @@ const home = () => {
   //   fetchData();
   // }, []);
 
+  // Only two parameters: income and dues
   const chartData = [
     {
-      name: 'Income',
-      amount: income,
-      color: isDarkMode ? '#222' : '#181818', // dark/light black
-      legendFontColor: isDarkMode ? '#fff' : '#181818',
-      legendFontSize: 15,
+      value: income,
+      color: '#313131', // Income: always light black
+      label: 'Income',
     },
     {
-      name: 'Dues',
-      amount: dues,
-      color: isDarkMode ? '#444' : '#333', // lighter black for contrast
-      legendFontColor: isDarkMode ? '#fff' : '#181818',
-      legendFontSize: 15,
+      value: dues,
+      color: '#888', // Dues: always grey
+      label: 'Dues',
     },
   ];
 
@@ -253,7 +264,7 @@ const home = () => {
   const fetchRecentTransactions = async (adminId) => {
     try {
       const q = query(
-        collectionGroup(db, 'transactions'),
+        collectionGroup(db, 'transactions'), where("adminId", "==", adminId),
         orderBy('paymentDate', 'desc'),
         limit(30)
       );
@@ -268,7 +279,7 @@ const home = () => {
         const pathSegments = docSnap.ref.path.split('/');
         const memberId = pathSegments[3];
 
-        const memberRef = doc(db, 'admin', adminId, 'members', memberId);
+  const memberRef = doc(db, 'admin', adminId, 'members', memberId);
         const memberSnap = await getDoc(memberRef);
         const memberData = memberSnap.exists() ? memberSnap.data() : {};
 
@@ -279,6 +290,7 @@ const home = () => {
           paymentDate: txnData.paymentDate,
           amountPaid: txnData.amountPaid,
           imageUrl: memberData.imageUrl || '',
+          receiptId: txnData.receiptId || '',
         });
       }
 
@@ -289,25 +301,45 @@ const home = () => {
     }
   };
 
+
   // Manual refresh function
-  const onRefresh = useCallback(async () => {
+  const onRefresh = useCallback(async (uidParam) => {
     setRefreshing(true);
     try {
-      // Refresh both summary and transactions
+      const uid = uidParam || auth.currentUser?.uid;
+      if (!uid) {
+        setTransactions([]);
+        setIncome(0);
+        setDues(0);
+        return;
+      }
       await Promise.all([
         fetchCurrentMonthSummary(),
-        fetchRecentTransactions(adminUID).then(setTransactions)
+        fetchRecentTransactions(uid).then(setTransactions)
       ]);
     } catch (error) {
       console.error('Error refreshing data:', error);
     } finally {
       setRefreshing(false);
     }
-  }, [adminUID]);
+  }, []);
 
-  // Initial load on component mount
-  React.useEffect(() => {
-    onRefresh();
+
+  // Listen for auth state changes to update data for the current user
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      const newUID = user?.uid || "";
+      setAdminUID(newUID);
+      setTransactions([]); // Clear old transactions immediately
+      setIncome(0);
+      setDues(0);
+      if (newUID) {
+        onRefresh(newUID);
+      }
+    });
+    // Initial load
+    onRefresh(auth.currentUser?.uid);
+    return () => unsubscribe && unsubscribe();
   }, []);
 
 
@@ -317,7 +349,7 @@ const home = () => {
 
 
   return (
-    <SafeAreaView style={{ ...styles.container, backgroundColor: isDarkMode ? '#181818' : '#fff' }}>
+    <SafeAreaView style={{backgroundColor: isDarkMode ? '#181818' : '#fff' }}>
       {/* Header */}
       <View style={[styles.header, { backgroundColor: isDarkMode ? '#232323' : '#fff' }]}>
         <Text style={[styles.greeting, { color: isDarkMode ? '#fff' : '#222' }]}>Hi, Admin</Text>
@@ -325,9 +357,9 @@ const home = () => {
           <TouchableOpacity onPress={toggleTheme} style={{ marginRight: 10 }}>
             <Ionicons name={isDarkMode ? 'sunny-outline' : 'moon-outline'} size={24} color={isDarkMode ? '#fff' : '#222'} />
           </TouchableOpacity>
-          <TouchableOpacity>
+          {/* <TouchableOpacity>
             <Ionicons name="notifications-outline" size={24} color={isDarkMode ? '#fff' : colors.gwhite} />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
         </View>
       </View>
       <ScrollView
@@ -335,92 +367,172 @@ const home = () => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={[isDarkMode ? '#fff' : colors.wblack]}
-            tintColor={isDarkMode ? '#fff' : colors.wblack}
+            colors={[isDarkMode ? '#444' : '#4F8EF7']}
+            tintColor={isDarkMode ? '#212121' : '#4F8EF7'}
             title="Pull to refresh"
-            titleColor={isDarkMode ? '#fff' : colors.wblack}
+            titleColor={isDarkMode ? '#333' : '#4F8EF7'}
           />
         }
       >
         <View style={styles.container2}>
           {/* Chart Name */}
-          <View style={[styles.finance_box, { backgroundColor: isDarkMode ? '#232323' : '#fff' }]}>
-            <Text style={[styles.chartTitle, { color: isDarkMode ? '#fff' : '#181818' }]}>Revenue</Text>
-            <View style={[styles.finance_box_in, { backgroundColor: isDarkMode ? '#181818' : '#fff', borderColor: isDarkMode ? '#333' : '#e0e0e0' }]}>
-              <Text style={[styles.chartdate, { color: isDarkMode ? '#fff' : '#181818' }]}>{month}</Text>
-              {/* Pie Chart */}
-              <View style={{ alignItems: 'center', justifyContent: 'flex-start', height: 200, width: screenWidth * 0.8 }}>
-                <DonutChart
-                  data={[
-                    { value: income, color: isDarkMode ? '#fff' : '#181818', label: 'Paid' },
-                    { value: dues, color: isDarkMode ? '#888' : '#bbb', label: 'Unpaid' },
-                    { value: Math.max(0,income ), color: isDarkMode ? '#444' : '#e0e0e0', label: 'New' },
-                  ]}
-                  total={income + dues + Math.max(0, (income + dues) * 0.3)}
-                  label={"Total Revenue"}
-                  isDarkMode={isDarkMode}
-                />
-                {/* Legend */}
-                <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 10 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: 8 }}>
-                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: isDarkMode ? '#fff' : '#181818', marginRight: 6 }} />
-                    <Text style={{ color: isDarkMode ? '#fff' : '#181818', fontSize: 13 }}>Paid {Math.round((income / (income + dues + Math.max(0, (income + dues) * 0.3))) * 100) || 0}%</Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: 8 }}>
-                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: isDarkMode ? '#888' : '#bbb', marginRight: 6 }} />
-                    <Text style={{ color: isDarkMode ? '#fff' : '#181818', fontSize: 13 }}>Unpaid {Math.round((dues / (income + dues + Math.max(0, (income + dues) * 0.3))) * 100) || 0}%</Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: 8 }}>
-                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: isDarkMode ? '#444' : '#e0e0e0', marginRight: 6 }} />
-                    <Text style={{ color: isDarkMode ? '#fff' : '#181818', fontSize: 13 }}>New 30%</Text>
+          <TouchableOpacity activeOpacity={0.85} onPress={() => router.push('/(tabs)/dashboard')}>
+            <View style={[styles.finance_box, { backgroundColor: isDarkMode ? '#232323' : '#fff' }]}> 
+              <Text style={[styles.chartTitle, { color: isDarkMode ? '#fff' : '#181818' }]}>Revenue</Text>
+              <View style={[styles.finance_box_in, { backgroundColor: isDarkMode ? '#181818' : '#fff', borderColor: isDarkMode ? '#333' : '#e0e0e0' }]}> 
+                <Text style={[styles.chartdate, { color: isDarkMode ? '#fff' : '#181818' }]}>{month}</Text>
+                {/* Pie Chart */}
+                <View style={{ alignItems: 'center', justifyContent: 'flex-start', height: 200, width: screenWidth * 0.8 }}>
+                  <DonutChart
+                    data={chartData}
+                    total={income + dues}
+                    label={""}
+                    isDarkMode={isDarkMode}
+                  />
+                  {/* Legend */}
+                  <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 10 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: 8 }}>
+                      <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.lblack, marginRight: 6 }} />
+                      <Text style={{ color: isDarkMode ? '#fff' : '#181818', fontSize: 13 }}>Income</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: 8 }}>
+                      <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.dgray, marginRight: 6 }} />
+                      <Text style={{ color: isDarkMode ? '#fff' : '#181818', fontSize: 13 }}>Dues</Text>
+                    </View>
                   </View>
                 </View>
+                {/* Income & Dues */}
+                {/* <View style={styles.amountInfo_box}>
+                  <View style={styles.amountInfo}>
+                    <Text style={[styles.amountInfo_txt, { color: isDarkMode ? '#fff' : '#181818' }]}>Total Income: ₹{income}</Text>
+                    <Text style={[styles.amountInfo_txt, { color: isDarkMode ? '#fff' : '#181818' }]}>Dues Amount: ₹{dues}</Text>
+                  </View>
+                  <View style={styles.amountInfo}>
+                    <TouchableOpacity style={[styles.moreinfo, { backgroundColor: isDarkMode ? '#333' : '#808080' }]}><Text style={[styles.amountInfo_txt, { color: isDarkMode ? '#fff' : '#181818' }]}>More</Text></TouchableOpacity>
+                  </View>
+                </View> */}
               </View>
-              {/* Income & Dues */}
-              {/* <View style={styles.amountInfo_box}>
-                <View style={styles.amountInfo}>
-                  <Text style={[styles.amountInfo_txt, { color: isDarkMode ? '#fff' : '#181818' }]}>Total Income: ₹{income}</Text>
-                  <Text style={[styles.amountInfo_txt, { color: isDarkMode ? '#fff' : '#181818' }]}>Dues Amount: ₹{dues}</Text>
-                </View>
-                <View style={styles.amountInfo}>
-                  <TouchableOpacity style={[styles.moreinfo, { backgroundColor: isDarkMode ? '#333' : '#808080' }]}><Text style={[styles.amountInfo_txt, { color: isDarkMode ? '#fff' : '#181818' }]}>More</Text></TouchableOpacity>
-                </View>
-              </View> */}
             </View>
-          </View>
+          </TouchableOpacity>
+          {/* Scan QR Container */}
+          <TouchableOpacity
+            activeOpacity={0.85}
+            style={{ marginTop: 18, marginBottom: 10 }}
+            onPress={() => router.push('/(screens)/scanqr')}
+          >
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: isDarkMode ? '#232323' : '#fff',
+              borderRadius: 16,
+              paddingVertical: 18,
+              marginHorizontal: 10,
+              shadowColor: '#000',
+              shadowOpacity: 0.08,
+              shadowRadius: 8,
+              elevation: 2,
+              borderWidth: 1,
+              borderColor: isDarkMode ? '#333' : '#e0e0e0',
+            }}>
+              {/* <Ionicons name="scan-outline" size={32} color={isDarkMode ? '#fff' : '#616161'} style={{ marginRight: 14 }} /> */}
+              <MaterialCommunityIcons name="qrcode-scan" size={35} color={isDarkMode ? '#fff' : '#333'} style={{ marginRight: 14 }} />
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: isDarkMode ? '#fff' : '#000' }}>Mark Attendance</Text>
+            </View>
+          </TouchableOpacity>
           {/* Transactions */}
-          <Text style={[styles.sectionTitle, { color: isDarkMode ? '#fff' : '#181818' }]}>Recent Transactions</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingRight: 24, marginBottom: 2 }}>
+            <Text style={[styles.sectionTitle, { color: isDarkMode ? '#fff' : '#181818', marginBottom: 0 }]}>Recent Transactions</Text>
+            <TouchableOpacity onPress={() => router.push('/(screens)/alltransactions')}>
+              <Text style={{ color: '#4F8EF7', fontWeight: 'bold', fontSize: 15 }}>See All</Text>
+            </TouchableOpacity>
+          </View>
           <View style={styles.flatlisting}>
             {transactions.length > 0 ? (
               <FlatList
                 data={transactions}
                 keyExtractor={(item) => item.id + item.paymentDate}
-                renderItem={({ item }) => (
-                  <View style={[styles.card, { backgroundColor: isDarkMode ? '#232323' : '#fff' }]}>
-                    <Image
-                      source={
-                        item.imageUrl?.data
-                          ? { uri: item.imageUrl?.data }
-                          : require('../../assets/images/Avatar/man3.png')
-                      }
-                      style={styles.image}
-                    />
-                    <View style={{ marginLeft: 10 }}>
-                      <Text style={[styles.name, { color: isDarkMode ? '#fff' : '#181818' }]}>{item.memberName}</Text>
-                      <Text style={{ color: isDarkMode ? '#fff' : '#181818' }}>Paid: ₹{item.amountPaid}</Text>
-                      <Text style={{ color: isDarkMode ? '#fff' : '#181818' }}>
-                        Date: {new Date(item.paymentDate).toLocaleString('en-GB', {
-                          day: '2-digit',
-                          month: '2-digit',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          hour12: true,
-                        })}
-                      </Text>
-                    </View>
-                  </View>
-                )}
+                renderItem={({ item }) => {
+                  // Status logic (mocked for demo, replace with real status if available)
+                  let status = 'Sent';
+                  let statusColor = '#4F8EF7';
+                  if (item.status) {
+                    if (item.status === 'Unsuccessful') { statusColor = '#E53935'; status = 'Unsuccessful'; }
+                    else if (item.status === 'Pending') { statusColor = '#FFA726'; status = 'Pending'; }
+                    else { statusColor = '#4F8EF7'; status = 'Sent'; }
+                  } else {
+                    // Demo: alternate status for variety
+                    const idx = transactions.indexOf(item) % 3;
+                    if (idx === 0) { status = 'Unsuccessful'; statusColor = '#E53935'; }
+                    else if (idx === 1) { status = 'Sent'; statusColor = '#4F8EF7'; }
+                    else { status = 'Pending'; statusColor = '#FFA726'; }
+                  }
+                  // Avatar color
+                  const avatarColors = ['#FFB07C', '#FFD580', '#A5D8FF', '#B5EAD7', '#FFB5B5'];
+                  const avatarColor = avatarColors[(item.memberName?.charCodeAt(0) || 0) % avatarColors.length];
+                  // Date/time formatting
+                  const d = new Date(item.paymentDate);
+                  const hours = d.getHours();
+                  const minutes = d.getMinutes().toString().padStart(2, '0');
+                  const ampm = hours >= 12 ? 'PM' : 'AM';
+                  const hour12 = hours % 12 || 12;
+                  const day = d.getDate();
+                  const month = d.toLocaleString('default', { month: 'short' });
+                  const dateStr = `${day} ${month} ${d.getFullYear()}, ${hour12}:${minutes} ${ampm}`;
+                  return (
+                    <TouchableOpacity
+                      activeOpacity={0.85}
+                      onPress={() => router.push({
+                        pathname: '/(screens)/alltransactions',
+                        params: { txnId: item.receiptId || item.id }
+                      })}
+                    >
+                      <View
+                        style={[
+                          styles.txnCardContainer,
+                          {
+                            backgroundColor: isDarkMode ? '#232323' : '#fff',
+                            borderColor: isDarkMode ? '#333' : '#e0e0e0',
+                            shadowColor: isDarkMode ? '#000' : '#bbb',
+                          },
+                        ]}
+                      >
+                        {/* Avatar: show image if available, else initial */}
+                        {item.imageUrl?.data ? (
+                          <Image
+                            source={{ uri: item.imageUrl?.data }}
+                            style={[
+                              styles.txnAvatar,
+                              {
+                                backgroundColor: isDarkMode ? '#232323' : '#eee',
+                                borderWidth: 1,
+                                borderColor: isDarkMode ? '#444' : '#bbb',
+                              },
+                            ]}
+                            resizeMode="cover"
+                          />
+                        ) : (
+                          <View style={[styles.txnAvatar, { backgroundColor: avatarColor }]}> 
+                            <Text style={[styles.txnAvatarText, { color: isDarkMode ? '#fff' : '#232323' }]}>{item.memberName?.[0]?.toUpperCase() || '?'}</Text>
+                          </View>
+                        )}
+                        {/* Main content */}
+                        <View style={{ flex: 1, marginLeft: 10 }}>
+                          <Text style={[styles.txnName, { color: isDarkMode ? '#fff' : '#181818' }]} numberOfLines={1}>{item.memberName}</Text>
+                          <Text style={[styles.txnId, { color: isDarkMode ? '#bdbdbd' : '#888' }]}>{item.receiptId ? item.receiptId : (item.id?.slice(0, 9) || '')}</Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                            <Text style={[styles.txnDate, { color: isDarkMode ? '#b1b1b1' : '#888' }]}>{dateStr}</Text>
+                          </View>
+                        </View>
+                        {/* Amount and status */}
+                        <View style={{ alignItems: 'flex-end', justifyContent: 'center', minWidth: 80 }}>
+                          <Text style={[styles.txnAmount, { color: isDarkMode ? '#fff' : '#181818' }]}>₹{item.amountPaid}</Text>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                }}
+                showsVerticalScrollIndicator={false}
               />
             ) : (
               <Text style={{ textAlign: 'center', marginTop: 20, color: isDarkMode ? '#fff' : '#181818', height: 150 }}>
@@ -436,10 +548,7 @@ const home = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    // padding: 16,
-    backgroundColor: '#fff',
-  },
+ 
   containe2: {
     padding: 16,
     backgroundColor: '#fff',
@@ -538,39 +647,71 @@ const styles = StyleSheet.create({
     // justifyContent : 'center',
     alignItems: 'center',
   },
-  transactionCard: {
+  // --- Transaction Card Redesign ---
+  txnCardContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 8,
-    backgroundColor: colors.wblack,
-    padding: 10,
-    borderRadius: 40,
-    width: moderateScale(330),
-    height: moderateScale(58),
-    borderWidth: 0.4,
-    bordercolor: colors.lgray,
+    marginVertical: 4, // Reduced gap between cards
+    backgroundColor: '#181818',
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    borderRadius: 18,
+    width: moderateScale(340),
+    minHeight: moderateScale(80),
+    borderWidth: 1,
+    borderColor: '#232323',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.10,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  transactionImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 12,
+  txnAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 2,
   },
-  transactionText: {
-    flex: 1,
+  txnAvatarText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 20,
   },
-  name: {
-    color: '#181818',
+  txnName: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 0,
   },
-  time: {
-    color: '#777',
+  txnId: {
+    color: '#bdbdbd',
+    fontSize: 13,
+    marginTop: 1,
+    marginBottom: 1,
   },
-  amount: {
-    fontWeight: '600',
-    color: colors.mgreen,
-    paddingRight: 10,
+  txnDate: {
+    color: '#b1b1b1',
+    fontSize: 13,
+    marginLeft: 2,
+  },
+  txnAmount: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 18,
+    marginBottom: 0,
+  },
+  txnStatus: {
+    fontWeight: 'bold',
+    fontSize: 13,
+    marginTop: 2,
+    marginBottom: 0,
+  },
+  txnAccountType: {
+    color: '#b1b1b1',
+    fontSize: 12,
+    marginTop: 2,
   },
   card: {
     flexDirection: 'row',
@@ -587,7 +728,7 @@ const styles = StyleSheet.create({
   },
   blankbox: {
     width: 50,
-    height: moderateScale(125),
+    height: moderateScale(130),
     // borderRadius: 25,
   },
   donutCenterOverlay: {

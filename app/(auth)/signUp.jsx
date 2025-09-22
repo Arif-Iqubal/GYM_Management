@@ -1,20 +1,19 @@
-import { View, Text, StyleSheet, TouchableOpacity, TextInput,ActivityIndicator, ToastAndroid  } from 'react-native';
-import React, { useContext, useState } from 'react';
-import { createUserWithEmailAndPassword , sendEmailVerification ,signOut } from 'firebase/auth';
-import { auth, db } from '../../config/firebaseconfig';
-import { doc, setDoc } from 'firebase/firestore';
-import { userDetailContext } from '../../context/userDetailContext';
-import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import Feather from '@expo/vector-icons/Feather';
 import Fontisto from '@expo/vector-icons/Fontisto';
 import Foundation from '@expo/vector-icons/Foundation';
-import Feather from '@expo/vector-icons/Feather';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { moderateScale } from 'react-native-size-matters';
-import colors  from './../../assets/colors';
+import { useRouter } from 'expo-router';
+import { createUserWithEmailAndPassword, sendEmailVerification, signOut } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
 import { Formik } from 'formik';
+import { useContext, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, TextInput, ToastAndroid, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { moderateScale } from 'react-native-size-matters';
 import * as Yup from 'yup';
+import { auth, db } from '../../config/firebaseconfig';
+import { userDetailContext } from '../../context/userDetailContext';
+import colors from './../../assets/colors';
 // import React from 'react';
 // import { styles } from './signUp copy';
 
@@ -83,17 +82,16 @@ const SignUp = () => {
       const resp = await createUserWithEmailAndPassword(auth, email, password);
       const user = resp.user;
       console.log(user);
-  
+
       // Send email verification
-      await sendEmailVerification(user);
-      // ToastAndroid.show('Verification email sent. Please verify your email.', ToastAndroid.LONG);
+      await sendEmailVerification(auth.currentUser);
       alert('Verification email sent. Please verify your email.');
       await saveUser(user);
       await signOut(auth);
       setLoading(false);
-      
-      // Optionally, navigate to login screen after verification prompt
-      router.replace('/auth/signIn');
+
+      // Navigate to login page (ensure correct path and case)
+      router.replace('/(auth)/login');
     } catch (error) {
       setLoading(false);
       console.log(error.message);
@@ -137,7 +135,7 @@ const SignUp = () => {
             <Text style={styles.logintext}>
               Create<Text style={styles.gogreen}> New </Text>Account
             </Text>
-            <Text style={styles.gogreen}>Find Your Perfect Room – Sign Up Now!</Text>
+            {/* <Text style={styles.gogreen}>Find Your Perfect Room – Sign Up Now!</Text> */}
           </View><View style={styles.body}>
               <View style={styles.userpasbox}>
                 <View style={styles.username}>
@@ -228,7 +226,7 @@ const SignUp = () => {
 
               {/* </View> */}
             </View><View style={styles.footer}>
-              <TouchableOpacity disabled={!isValid} activeOpacity={0.8} style={[styles.loginbutton,{ backgroundColor : isValid ? colors.pgreen :colors.pgreenl}]} onPress={createNewAccount}>
+              <TouchableOpacity disabled={!isValid} activeOpacity={0.8} style={styles.loginbutton}onPress={createNewAccount}>
                 {!loading ? <Text style={styles.loginb}>Get Started</Text> :
                   <ActivityIndicator size={'large'} color={colors.cwhite} />
                   // <Text>Loading..</Text>
@@ -237,22 +235,22 @@ const SignUp = () => {
 
               </TouchableOpacity>
 
-              <View style={styles.ortextbox}>
+              {/* <View style={styles.ortextbox}>
                 <Text style={styles.ortext}>Or</Text>
               </View>
 
               <TouchableOpacity activeOpacity={0.5} style={styles.congoogle}>
                 <Ionicons name="logo-google" size={24} color="black" />
                 <Text style={styles.cgoogletext}>Google</Text>
-              </TouchableOpacity>
+              </TouchableOpacity> */}
 
-              <View style={styles.signupbox}>
+              {/* <View style={styles.signupbox}>
                 <TouchableOpacity activeOpacity={0.5} onPress={() => router.push('/auth/signIn')}>
                   <Text style={styles.signuptext}>
                     Already have an account? <Text style={styles.signupminitext}>Login</Text>
                   </Text>
                 </TouchableOpacity>
-              </View>
+              </View> */}
               </View>
             </View></>
          )}
@@ -381,7 +379,7 @@ footer : {
 
 
 loginbutton : {
-  backgroundColor : colors.pgreen,
+  backgroundColor : '#24a0ed',
   borderRadius : moderateScale(30),
   // height : moderateScale(45),
   width : moderateScale(250),
@@ -469,7 +467,7 @@ keyicon : {
 },
 gogreen : {
   // color : colors.pgreen
-  color : '#f9f9f9'
+  color : '#3a1c71'
 }, namerror: {
   color : 'red',
   textAlign : 'right',

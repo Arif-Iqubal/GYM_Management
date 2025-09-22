@@ -1,7 +1,7 @@
 import colors from "@/assets/colors";
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { ActivityIndicator, Alert, Button, Image, Modal, ScrollView, StyleSheet, Text, TextInput, ToastAndroid, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Button, Image, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, ToastAndroid, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { moderateScale } from 'react-native-size-matters';
 import { useTheme } from '../../context/ThemeContext';
@@ -37,6 +37,9 @@ const AddMember = () => {
 
   const [image, setImage] = useState(null);
   const [formValid, setFormValid] = useState(false);
+  const [qrData, setQrData] = useState(null);
+  const [qrSvgRef, setQrSvgRef] = useState(null);
+  const [pendingQrUpload, setPendingQrUpload] = useState(null);
   // Validation helpers
   const validateEmail = (email) => {
     return /^\S+@\S+\.\S+$/.test(email);
@@ -94,7 +97,7 @@ const AddMember = () => {
 
   const [showDOBPicker, setShowDOBPicker] = useState(false);
   const [showJoinPicker, setShowJoinPicker] = useState(false);
-  const [adminUID, setAdminUID] = useState("ecNCqm8PgxOEgG9S7puVpm2hVZn2");
+  const [adminUID, setAdminUID] = useState(auth.currentUser?.uid || "");
 
 
   //  const [image, setImage] = useState(null);
@@ -103,6 +106,33 @@ const AddMember = () => {
   const handleChange = (name, value) => {
     setForm({ ...form, [name]: value });
   };
+
+  // Helper to upload QR code after member is created
+  // Upload QR code image and update Firestore
+  // const uploadQrAndSave = async (memberidString, memberRefId, uid) => {
+  //   if (!qrSvgRef) {
+  //     // Wait for QR ref to be set after render
+  //     setPendingQrUpload({ memberidString, memberRefId, uid });
+  //     return;
+  //   }
+  //   qrSvgRef.toDataURL(async (data) => {
+  //     try {
+  //       const dataUrl = `data:image/png;base64,${data}`;
+  //       const qrCodeUrl = await uploadFileToCloudinary(dataUrl, 'member_qrcodes');
+  //       await updateDoc(doc(db, 'admin', uid, 'members', memberRefId), { qrCodeUrl });
+  //     } catch (err) {
+  //       console.error('QR upload error:', err);
+  //     }
+  //   });
+  // };
+
+  // // Effect: if pendingQrUpload is set and qrSvgRef is ready, upload
+  // useEffect(() => {
+  //   if (pendingQrUpload && qrSvgRef) {
+  //     uploadQrAndSave(pendingQrUpload.memberidString, pendingQrUpload.memberRefId, pendingQrUpload.uid);
+  //     setPendingQrUpload(null);
+  //   }
+  // }, [pendingQrUpload, qrSvgRef]);
 
   const handleSubmit = async () => {
     console.log('Save pressed');
@@ -153,6 +183,14 @@ const AddMember = () => {
       Alert.alert('Invalid Paid Amount', 'Please enter a valid paid amount.');
       return;
     }
+      // Alert if paid amount is greater than admission fee + plan price
+      const planPrice = parseFloat(selectedPlan?.price || 0);
+      const admissionFee = parseFloat(form.admissionFee || 0);
+      const paidAmount = parseFloat(form.paidAmount || 0);
+      if (paidAmount > (admissionFee + planPrice)) {
+        Alert.alert('Overpayment', 'Paid amount cannot be greater than Admission Fee + Plan Price.');
+        return;
+      }
     if (!form.paymentMethod) {
       Alert.alert('Missing Payment Method', 'Please select payment method.');
       return;
@@ -172,10 +210,40 @@ const AddMember = () => {
 
     // Calculate expiry date
     const joinDateObj = new Date(form.joiningDate);
-    const planExpireDate = new Date(joinDateObj);
-    planExpireDate.setDate(joinDateObj.getDate() + planDuration);
+    // const planExpireDate = new Date(joinDateObj);
+    // planExpireDate.setDate(joinDateObj.getDate() + planDuration - 2);
+    let planExpireDate = new Date(joinDateObj);
+    // planExpireDate.setDate(planExpireDate.getDate() + planDuration - 1);
+    // let planExpireDate = new Date(joinDate);
+console.log('Plan Duration:', planDuration);
+// Add months
+function addMonthsSafe(date, monthsToAdd) {
+  const d = new Date(date); // clone the original date
+  const day = d.getDate();
 
-    try {
+  // Set month
+  d.setMonth(d.getMonth() + monthsToAdd);
+console.log('After adding months:', d);
+  // Handle month overflow (e.g., adding 1 month to Jan 31 → Feb 28)
+  if (d.getDate() < day) {
+    d.setDate(0); // move to last day of previous month
+  }
+
+  return d;
+}
+console.log('Before adjusting for inclusive duration:', planExpireDate);
+// Usage:console
+const currtoday = new Date();
+ planExpireDate = addMonthsSafe(currtoday, planDuration);
+ planExpireDate = planExpireDate;
+
+// Subtract 1 day for inclusive duration
+planExpireDate.setDate(planExpireDate.getDate() - 1);
+
+console.log(planExpireDate.toISOString().split('T')[0]); // YYYY-MM-DD
+
+
+  try {
       // 1. Get the highest memberid from Firestore (robust extraction)
       let newMemberId = 1;
       const membersRef = collection(db, 'admin', uid, 'members');
@@ -204,7 +272,15 @@ const AddMember = () => {
         joiningDate: form.joiningDate.toISOString(),
         planExpireDate: planExpireDate.toISOString(),
         createdAt: new Date().toISOString(),
+        activemember: true,
+        expiredmember: false,
+        newmember: true,
       });
+
+      // Generate and upload QR code for memberid
+      // setQrData(memberidString);
+      // Upload QR after QRCode ref is set (handled by effect)
+      // await uploadQrAndSave(memberidString, memberRef.id, uid);
 
       // Step 2: Add initial transaction inside the member document
       const today2 = new Date();
@@ -221,7 +297,24 @@ const AddMember = () => {
           planDetail: form.gymPlan,
           planDuration: planDuration,
           planExpireDate: planExpireDate.toISOString(),
-          receiptId: `TXN${Date.now()}`
+          receiptId: `TXN${Date.now()}`,
+          adminId: uid
+        }
+      );
+      await setDoc(
+        doc(db, 'admin', uid, 'members', memberRef.id, 'plandetails','current'),
+        {
+          planname: selectedPlan?.name || form.gymPlan,
+          paymentDate: today2.toISOString(),
+          amountPaid: parseFloat(form.paidAmount) || 0,
+          paymentMethod: form.paymentMethod,
+          dues: parseFloat(form.dues) || 0,
+          // planDetail: form.gymPlan,
+          planDuration: planDuration,
+          planExpireDate: planExpireDate.toISOString(),
+          planStartDate: form.joiningDate.toISOString(),
+          receiptId: `TXN${Date.now()}`,
+          planPurchaseDate: new Date().toISOString(),
         }
       );
 
@@ -231,7 +324,8 @@ const AddMember = () => {
         amountPaid,
         dues,
         monthIndex,
-        year
+        year,
+        admissionFee = 0
       ) => {
         const month = String(monthIndex + 1).padStart(2, '0'); // "01"–"12"
         const summaryRef = doc(db, 'admin', adminId, 'financialSummary', String(year));
@@ -245,44 +339,46 @@ const AddMember = () => {
           if (docSnap.exists()) {
             const data = docSnap.data();
             monthly = data.monthly || {};
-            yearlyTotal = data.yearlyTotal || {};
+            yearlyTotal = data.yearlyTotal || { income: 0, dues: 0 };
           }
 
+          // Ensure numbers
+          amountPaid = Number(amountPaid) || 0;
+          dues = Number(dues) || 0;
+
+          // Add paid amount and dues to this month
           const currentMonthData = monthly[month] || { income: 0, dues: 0 };
+          currentMonthData.income = Number(currentMonthData.income) || 0;
+          currentMonthData.dues = Number(currentMonthData.dues) || 0;
+          currentMonthData.admissionFee = Number(currentMonthData.admissionFee) || 0;
           currentMonthData.income += amountPaid;
           currentMonthData.dues += dues;
+          currentMonthData.admissionFee += Number(admissionFee) || 0;
           monthly[month] = currentMonthData;
 
-          // Recalculate yearly total
-          const allMonths = Object.values(monthly);
-          yearlyTotal.income = allMonths.reduce((sum, m) => sum + (m.income || 0), 0);
-          yearlyTotal.dues = allMonths.reduce((sum, m) => sum + (m.dues || 0), 0);
+          // Add to yearlyTotal
+          yearlyTotal.income = Number(yearlyTotal.income) || 0;
+          yearlyTotal.dues = Number(yearlyTotal.dues) || 0;
+          yearlyTotal.income += amountPaid;
+          yearlyTotal.dues += dues;
 
           await setDoc(summaryRef, {
             monthly,
             yearlyTotal,
-          });
+          }, { merge: true });
         } catch (err) {
           console.error('Error updating financial summary:', err.message);
         }
       };
 
-      // ✅ Update Financial Summary
+      // ✅ Update Financial Summary (only once)
       await updateFinancialSummary(
         uid,
         parseFloat(form.paidAmount) || 0,
         parseFloat(form.dues) || 0,
         today.getMonth(),
-        today.getFullYear()
-      );
-
-      // Update financial summary
-      await updateFinancialSummary(
-        uid,
-        parseFloat(form.paidAmount) || 0,
-        parseFloat(form.dues) || 0,
-        today.getMonth(),
-        today.getFullYear()
+        today.getFullYear(),
+        parseFloat(form.admissionFee) || 0
       );
 
       ToastAndroid.show('Member and transaction added successfully!', ToastAndroid.LONG);
@@ -303,7 +399,7 @@ const AddMember = () => {
         comments: '',
         address: '',
       });
-      setImage(null);
+  setImage(null);
       setLoading(false);
       router.push("/home");
     } catch (error) {
@@ -323,18 +419,18 @@ const AddMember = () => {
   const [selectedPlan, setSelectedPlan] = useState('');
 
   useEffect(() => {
-    const adminId = 'ecNCqm8PgxOEgG9S7puVpm2hVZn2';
-    // let q = collection(db, 'admin', adminId, 'members');
-    const unsub = onSnapshot(collection(db, 'admin', adminId, 'plans'), (snapshot) => {
+    // Always use the current logged-in admin's UID
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    const unsub = onSnapshot(collection(db, 'admin', uid, 'plans'), (snapshot) => {
       const list = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
-      setPlans(list);
+      setPlans(list); 
     });
-
     return () => unsub();
-  }, []);
+  }, [auth.currentUser]);
 
 
   const uploadImage = async (mode) => {
@@ -456,7 +552,7 @@ const AddMember = () => {
                   borderRadius: 15,
                 }}
               >
-                <SimpleLineIcons name="camera" size={30} color="black" />
+                <SimpleLineIcons name="camera" size={30} color={isDarkMode? '#111':'#222'} />
                 <Text
                   style={{
                     fontSize: 10,
@@ -475,7 +571,7 @@ const AddMember = () => {
                   borderRadius: 15,
                 }}
               >
-                <AntDesign name="picture" size={30} color="black" />
+                <AntDesign name="picture" size={30} color={isDarkMode? '#111':'#222'} />
                 <Text
                   style={{
                     fontSize: 10,
@@ -494,7 +590,7 @@ const AddMember = () => {
                   borderRadius: 15,
                 }}
               >
-                <AntDesign name="delete" size={30} color="black" />
+                <AntDesign name="delete" size={30} color={isDarkMode? '#111':'#222'} />
                 <Text
                   style={{
                     fontSize: 10,
@@ -524,7 +620,21 @@ const AddMember = () => {
 
 
   return (
-    <SafeAreaView style={[styles.mainbody, { backgroundColor: isDarkMode ? '#181818' : '#fff' }]}>
+    <SafeAreaView style={[styles.mainbody, { backgroundColor: isDarkMode ? '#181818' : '#fff' }]}>  
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+      >
+      {/* Hidden QR code for dataURL extraction */}
+      {/* {qrData && (
+        <QRCode
+          value={qrData}
+          size={200}
+          getRef={c => setQrSvgRef(c)}
+          style={{ position: 'absolute', left: -9999, top: -9999, opacity: 0 }}
+        />
+      )} */}
       <View style={[styles.headerbox, { backgroundColor: isDarkMode ? '#232323' : '#fff' }]}>
         <View style={styles.leftnav}>
           <TouchableOpacity onPress={onAgree} activeOpacity={0.8}><Ionicons name="chevron-back-sharp" size={26} color={isDarkMode ? '#fff' : '#181818'} /></TouchableOpacity>
@@ -534,73 +644,13 @@ const AddMember = () => {
           <Text style={[styles.savetext, { color: isDarkMode ? '#181818' : '#181818' }]}>Save</Text>
         </TouchableOpacity>
       </View>
-      {/* <ScrollView >
-        <View style={styles.Scrollbody}>
-          <View style={styles.imgboxout}>
-            <View style={styles.imgboxin}><Ionicons name="person-sharp" size={150} color="grey" /></View>
-            <View style={styles.clickicon}><Entypo name="images" size={24} color="black" /></View>
-          </View>
-          <View style={styles.inputbodym}>
-            <View style={styles.inputbody}>
-              <View style={styles.inputval}><TextInput placeholderTextColor={colors.dgrey}  placeholder='Enter Your Name' style={styles.inputval}></TextInput></View>
-            </View>
-            <View style={styles.inputbody}>
-              <View style={styles.inputval}><TextInput placeholderTextColor={colors.dgrey} placeholder='+91 ' style={styles.inputval}></TextInput></View>
-            </View>
-            <View style={styles.inputbody}>
-              <View style={styles.inputval}><TextInput placeholderTextColor={colors.dgrey} placeholder='Gender' style={styles.inputval}></TextInput></View>
-            </View>
-            <View style={styles.inputbody}>
-              <View style={styles.inputval}><TextInput placeholderTextColor={colors.dgrey} placeholder='Training Type' style={styles.inputval}></TextInput></View>
-            </View>
-            <View style={styles.inputbody}>
-              <View style={styles.inputval}><TextInput placeholderTextColor={colors.dgrey} placeholder='546' style={styles.inputval}></TextInput></View>
-            </View>
-            <View style={styles.inputbody}>
-              <View style={styles.inputval}><TextInput placeholderTextColor={colors.dgrey} placeholder='Email' style={styles.inputval}></TextInput></View>
-            </View>
-            <View style={styles.inputbody}>
-              <View style={styles.inputval}><TextInput placeholderTextColor={colors.dgrey} placeholder='DOB' style={styles.inputval}></TextInput></View>
-            </View>
-            <View style={styles.inputbody}>
-              <View style={styles.inputval}><TextInput placeholderTextColor={colors.dgrey} placeholder='Select Gym Plan' style={styles.inputval}></TextInput></View>
-            </View>
-            <View style={styles.inputbody}>
-              <View style={styles.inputval}><TextInput placeholderTextColor={colors.dgrey} placeholder='Admission Fees' style={styles.inputval}></TextInput></View>
-            </View>
-            <View style={styles.inputbody}>
-              <View style={styles.inputval}><TextInput placeholderTextColor={colors.dgrey} placeholder='Discount' style={styles.inputval}></TextInput></View>
-            </View>
-            <View style={styles.inputbody}>
-              <View style={styles.inputval}><TextInput placeholderTextColor={colors.dgrey} placeholder='Select joining Date' style={styles.inputval}></TextInput></View>
-            </View>
-            <View style={styles.inputbody}>
-              <View style={styles.inputval}><TextInput placeholderTextColor={colors.dgrey} placeholder='Paid Amount' style={styles.inputval}></TextInput></View>
-            </View>
-            <View style={styles.inputbody}>
-              <View style={styles.inputval}><TextInput placeholderTextColor={colors.dgrey} placeholder='Select Payment Method' style={styles.inputval}></TextInput></View>
-            </View>
-            <View style={styles.inputbody}>
-              <View style={styles.inputval}><TextInput placeholderTextColor={colors.dgrey} placeholder='Dues' style={styles.inputval}></TextInput></View>
-            </View>
-            <View style={styles.inputbody}>
-              <View style={styles.inputval}><TextInput placeholderTextColor={colors.dgrey} placeholder='Comments' style={styles.inputval}></TextInput></View>
-            </View>
-            <View style={styles.inputbody}>
-              <View style={styles.inputval}><TextInput placeholderTextColor={colors.dgrey} placeholder='Address' style={styles.inputval}></TextInput></View>
-            </View>
-          </View>
-        </View>
-      </ScrollView> */}
+     
 
 
 
 
 
-
-
-
-      <ScrollView contentContainerStyle={[styles.container, { backgroundColor: isDarkMode ? '#181818' : '#fff' }]}>
+  <ScrollView contentContainerStyle={[styles.container, { backgroundColor: isDarkMode ? '#181818' : '#fff' }]}> 
 
         <View style={styles.profileimgcontmain}>
           <View style={styles.bg}>
@@ -657,6 +707,7 @@ const AddMember = () => {
             value={form.dob}
             mode="date"
             display="default"
+            themeVariant={isDarkMode ? 'dark' : 'light'}
             onChange={(_, date) => {
               setShowDOBPicker(false);
               if (date) handleChange('dob', date);
@@ -671,7 +722,7 @@ const AddMember = () => {
           onValueChange={(itemValue) => {
             const plan = plans.find(p => p.id === itemValue);
             setSelectedPlan(plan);
-            handleChange('gymPlan', plan?.name || '');
+            handleChange('gymPlan', plan?.name ? plan.name : '');
             handleChange('gymPlanduration', plan?.duration ? plan.duration : 30);
           }}
         >
@@ -688,7 +739,7 @@ const AddMember = () => {
         {/* Show plan price if selected */}
         {selectedPlan && selectedPlan.price && (
           <Text style={{ marginBottom: 8, color: isDarkMode ? '#fff' : '#181818' }}>
-            Plan Price: ₹{selectedPlan.price}  |  Duration: {selectedPlan.duration} days
+            Plan Price: ₹{selectedPlan.price}  |  Duration: {selectedPlan.duration} Months
           </Text>
         )}
 
@@ -707,12 +758,15 @@ const AddMember = () => {
 
 
         <Text style={[styles.label, { color: isDarkMode ? '#fff' : '#181818' }]}>Select Joining Date</Text>
-        <Button backgroundColor={isDarkMode ? '#232323' : colors.gwhite} color={isDarkMode ? '#fff' : colors.lgrey} style={[styles.pickstyle, { backgroundColor: isDarkMode ? '#232323' : '#f5f5f5', color: isDarkMode ? '#fff' : '#181818' }]} title={form.joiningDate.toDateString()} onPress={() => setShowJoinPicker(true)} />
+        {/* <Button backgroundColor={isDarkMode ? '#232323' : '#333'} color={isDarkMode ? '#fff' : colors.lgrey} style={styles.pickstyle} title={form.joiningDate.toDateString()} onPress={() => setShowJoinPicker(true)} /> */}
+        <Button style={[styles.pickstyle, { backgroundColor: isDarkMode ? '#232323' : '#f5f5f5', color: isDarkMode ? '#fff' : '#181818' }]} title={form.joiningDate.toDateString()} onPress={() => setShowJoinPicker(true)} />
+
         {showJoinPicker && (
           <DateTimePicker
             value={form.joiningDate}
             mode="date"
             display="default"
+            themeVariant={isDarkMode ? 'dark' : 'light'}
             onChange={(_, date) => {
               setShowJoinPicker(false);
               if (date) handleChange('joiningDate', date);
@@ -744,6 +798,7 @@ const AddMember = () => {
           </View>
         </View>
       </Modal>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   )
 }

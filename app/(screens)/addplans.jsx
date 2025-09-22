@@ -1,27 +1,30 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  Button,
-  FlatList,
-  Alert,
-  Modal,
-  TouchableOpacity,
-  StyleSheet,
-} from 'react-native';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
-import { auth, db } from '../../config/firebaseconfig';
 import {
+  addDoc,
   collection,
-  getDocs,
   deleteDoc,
   doc,
+  getDocs,
   updateDoc,
-  addDoc,
 } from 'firebase/firestore';
+import React, { useEffect, useState } from 'react';
+import {
+  Alert,
+  Button,
+  FlatList,
+  Modal,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { auth, db } from '../../config/firebaseconfig';
+import { useTheme } from '../../context/ThemeContext';
+
 
 export default function ViewPlans() {
+  const { isDarkMode } = useTheme();
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
@@ -38,7 +41,7 @@ export default function ViewPlans() {
 
   const fetchPlans = async () => {
     try {
-      const querySnapshot = await getDocs(collection(db, 'admin', uid, 'plans'));
+  const querySnapshot = await getDocs(collection(db, 'admin', uid, 'plans'));
       const plansList = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
@@ -84,7 +87,7 @@ export default function ViewPlans() {
     }
 
     try {
-      const planRef = collection(db, 'admin', uid, 'plans');
+  const planRef = collection(db, 'admin', uid, 'plans');
       if (editingId) {
         await updateDoc(doc(planRef, editingId), {
           name,
@@ -123,7 +126,7 @@ export default function ViewPlans() {
       <View>
         <Text style={styles.planName}>{item.name}</Text>
         <Text style={styles.planPrice}>₹{item.price}</Text>
-        <Text style={styles.planPrice}>Days - {item.duration}</Text>
+        <Text style={styles.planPrice}>Months - {item.duration}</Text>
       </View>
       <View style={styles.actions}>
         <TouchableOpacity onPress={() => handleEdit(item)}>
@@ -137,20 +140,36 @@ export default function ViewPlans() {
   );
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.heading}>Your Plans</Text>
+    <View style={[styles.container, { backgroundColor: isDarkMode ? '#181818' : '#fff' }]}> 
+      <Text style={[styles.heading, { color: isDarkMode ? '#fff' : '#181818' }]}>Your Plans</Text>
       <FlatList
         data={plans}
         keyExtractor={(item) => item.id}
-        renderItem={renderItem}
+        renderItem={({ item }) => (
+          <View style={[styles.card, { backgroundColor: isDarkMode ? '#232323' : '#f1f1f1' }]}> 
+            <View>
+              <Text style={[styles.planName, { color: isDarkMode ? '#fff' : '#181818' }]}>{item.name}</Text>
+              <Text style={[styles.planPrice, { color: isDarkMode ? '#fff' : '#333' }]}>₹{item.price}</Text>
+              <Text style={[styles.planPrice, { color: isDarkMode ? '#fff' : '#333' }]}>Months - {item.duration}</Text>
+            </View>
+            <View style={styles.actions}>
+              <TouchableOpacity onPress={() => handleEdit(item)}>
+                <Feather name="edit" size={22} color="#007AFF" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => handleDelete(item.id)} style={{ marginLeft: 15 }}>
+                <MaterialIcons name="delete" size={24} color="red" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
         refreshing={loading}
         onRefresh={fetchPlans}
-        ListEmptyComponent={<Text>No plans found.</Text>}
+        ListEmptyComponent={<Text style={{ color: isDarkMode ? '#fff' : '#181818' }}>No plans found.</Text>}
       />
 
       {/* Floating + Button */}
       <TouchableOpacity
-        style={styles.floatingBtn}
+        style={[styles.floatingBtn, { backgroundColor: isDarkMode ? '#007bff' : '#007bff' }]}
         onPress={() => {
           setName('');
           setPrice('');
@@ -165,30 +184,33 @@ export default function ViewPlans() {
       {/* Modal */}
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>{editingId ? 'Edit Plan' : 'Add New Plan'}</Text>
+          <View style={[styles.modalContainer, { backgroundColor: isDarkMode ? '#232323' : '#fff' }]}> 
+            <Text style={[styles.modalTitle, { color: isDarkMode ? '#fff' : '#181818' }]}>{editingId ? 'Edit Plan' : 'Add New Plan'}</Text>
             <TextInput
               placeholder="Plan Name"
+              placeholderTextColor={isDarkMode ? '#aaa' : '#888'}
               value={name}
               onChangeText={setName}
-              style={styles.input}
+              style={[styles.input, { color: isDarkMode ? '#fff' : '#181818', borderColor: isDarkMode ? '#444' : '#ccc', backgroundColor: isDarkMode ? '#181818' : '#fff' }]}
             />
             <TextInput
-              placeholder="Plan Duration"
+              placeholder="Plan Duration in Months"
+              placeholderTextColor={isDarkMode ? '#aaa' : '#888'}
               value={duration}
               onChangeText={setDuration}
               keyboardType="numeric"
-              style={styles.input}
+              style={[styles.input, { color: isDarkMode ? '#fff' : '#181818', borderColor: isDarkMode ? '#444' : '#ccc', backgroundColor: isDarkMode ? '#181818' : '#fff' }]}
             />
             <TextInput
               placeholder="Plan Price"
+              placeholderTextColor={isDarkMode ? '#aaa' : '#888'}
               value={price}
               onChangeText={setPrice}
               keyboardType="numeric"
-              style={styles.input}
+              style={[styles.input, { color: isDarkMode ? '#fff' : '#181818', borderColor: isDarkMode ? '#444' : '#ccc', backgroundColor: isDarkMode ? '#181818' : '#fff' }]}
             />
-            <Button title={editingId ? 'Update' : 'Add'} onPress={handleSave} />
-            <Button title="Cancel" color="gray" onPress={() => setModalVisible(false)} />
+            <Button title={editingId ? 'Update' : 'Add'} onPress={handleSave} color={isDarkMode ? '#007bff' : undefined} />
+            <Button title="Cancel" color={isDarkMode ? '#888' : 'gray'} onPress={() => setModalVisible(false)} />
           </View>
         </View>
       </Modal>

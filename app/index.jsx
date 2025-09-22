@@ -1,18 +1,19 @@
-import { useEffect, useContext, useState } from "react";
-import React, { useRef } from 'react';
 import { useNavigation } from '@react-navigation/native';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 
-import { router, SplashScreen, useRouter } from "expo-router";
-import { Text, TouchableOpacity, View, StyleSheet, Image, ActivityIndicator, ToastAndroid , Dimensions, FlatList} from "react-native";
+import { useRouter } from "expo-router";
+import { Dimensions, FlatList, StyleSheet, Text, ToastAndroid, TouchableOpacity, View ,Image} from "react-native";
+// import LottieView from 'lottie-react-native';
+import LottieView from 'lottie-react-native';
+import OnboardingSlide from './OnboardingSlide';
 // import { View, Text, StyleSheet, Dimensions, FlatList, TouchableOpacity } from 'react-native';
 
-import { onAuthStateChanged , signOut } from "firebase/auth";
-import { auth, db } from "../config/firebaseconfig";
-import { userDetailContext } from "../context/userDetailContext";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { moderateScale, verticalScale, scale } from "react-native-size-matters";
-import colors from "@/assets/colors";
+import { moderateScale } from "react-native-size-matters";
+import { auth, db } from "../config/firebaseconfig";
+import { userDetailContext } from "../context/userDetailContext";
 
 
 const { width, height } = Dimensions.get('window');
@@ -20,21 +21,21 @@ const { width, height } = Dimensions.get('window');
 const slides = [
   {
     key: '1',
-    source: require('../assets/images/o1.png'),
+    lottie: require('../assets/images/Running.json'),
     title: 'Welcome to Gym Manager',
-    description: 'Easily manage gym members, payments, and attendance.',
+    description: 'Transform the way you train and track.',
   },
   {
     key: '2',
-    source: require('../assets/images/o2.png'),
+    lottie: require('../assets/images/Fitness.json'),
     title: 'Track Payments',
     description: 'Visualize income, dues, and financial insights.',
   },
   {
     key: '3',
-    source: require('../assets/images/o1.png'),
-    title: 'Smart Notifications',
-    description: 'Get alerts for dues, renewals, and more.',
+    lottie: require('../assets/images/coch.json'),
+    title: 'Insights & Reports',
+    description: 'Get real-time reports on gym performance, member engagement, and dues.',
   },
 ];
 
@@ -120,11 +121,7 @@ const index = () => {
   const [currentSlide, setCurrentSlide] = React.useState(0);
 
   const renderItem = ({ item }) => (
-    <View style={styles.slide}>
-      <Image style={styles.img} source={item.source}/>
-      <Text style={styles.title}>{item.title}</Text>
-      <Text style={styles.desc}>{item.description}</Text>
-    </View>
+    <OnboardingSlide item={item} />
   );
 
   const handleNext = () => {
@@ -142,41 +139,56 @@ const index = () => {
 
   
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.container}>
-      <FlatList
-        ref={flatListRef}
-        data={slides}
-        keyExtractor={(item) => item.key}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        renderItem={renderItem}
-        onScroll={(e) => {
-          const index = Math.round(e.nativeEvent.contentOffset.x / width);
-          setCurrentSlide(index);
-        }}
-      />
 
-      <View style={styles.footer}>
-        <View style={styles.dots}>
-          {slides.map((_, index) => (
-            <View
-              key={index}
-              style={[
-                styles.dot,
-                currentSlide === index && { backgroundColor: '#6200ee' },
-              ]}
-            />
-          ))}
+    <SafeAreaView style={styles.container}>
+      {loading ? (
+        <View style={styles.loaderContainer}>
+          <LottieView
+            source={require('../assets/images/Fitness.json')}
+            autoPlay
+            loop
+            style={{ width: 300, height: 300, marginTop: -90 }}
+          />
+          <Image
+            source={require('../assets/images/kgflexbg.png')}
+            style={{ width: 400, height: 200, resizeMode: 'contain', marginTop: -30 }}
+          />
         </View>
-        <TouchableOpacity style={styles.button} onPress={handleNext}>
-          <Text style={styles.buttonText}>
-            {currentSlide === slides.length - 1 ? 'Get Started' : 'Next'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+      ) : (
+        <View style={styles.container}>
+          <FlatList
+            ref={flatListRef}
+            data={slides}
+            keyExtractor={(item) => item.key}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            renderItem={renderItem}
+            onScroll={(e) => {
+              const index = Math.round(e.nativeEvent.contentOffset.x / width);
+              setCurrentSlide(index);
+            }}
+          />
+          <View style={styles.footer}>
+            <View style={styles.dots}>
+              {slides.map((_, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.dot,
+                    currentSlide === index && { backgroundColor: '#6200ee' },
+                  ]}
+                />
+              ))}
+            </View>
+            <TouchableOpacity style={styles.button} onPress={handleNext}>
+              <Text style={styles.buttonText}>
+                {currentSlide === slides.length - 1 ? 'Get Started' : 'Next'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -279,6 +291,24 @@ const styles = StyleSheet.create({
   //   borderRadius: moderateScale(30),
   // },
   // splash: {
+  loaderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#e6eae6ff',
+    width: '100%',
+    height: '100%',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    zIndex: 10,
+  },
+  kgfText: {
+    fontSize: 50,
+    fontWeight: 'bold',
+    color: '#0e0e0ec0',
+    letterSpacing: 4,
+  },
   //   // backgroundColor: "#2d3a3a",
   //   flex :1,
   //   alignItems: 'center',

@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ToastAndroid, TextInput, Imag
 import React, { useContext, useState } from 'react';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { auth, db } from '../../config/firebaseconfig';
+import { sendPasswordResetEmail } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { userDetailContext } from '../../context/userDetailContext';
 import { useRouter } from 'expo-router';
@@ -15,7 +16,7 @@ import Fontisto from '@expo/vector-icons/Fontisto';
 import Foundation from '@expo/vector-icons/Foundation';
 import colors from '@/assets/colors';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { Colors } from 'react-native/Libraries/NewAppScreen';
+//import { Colors } from 'react-native/Libraries/NewAppScreen';
 import firebase from 'firebase/compat/app';
 // import { ActivityIndicator } from 'react-native-web';
 
@@ -43,14 +44,17 @@ const SignIn = () => {
 
   //ResetPassword
   const changepassword = () => {
-    // firebase.sendPasswordResetEmail(email)
-    // .then(() => {
-    //   alert("Password rest email sent")
-
-    // }).catch((error) => {
-    //   alert(error)
-    // })
-    router.push("/auth/forgetpassword")
+    if (!email) {
+      ToastAndroid.show('Please enter your email above first.', ToastAndroid.LONG);
+      return;
+    }
+    sendPasswordResetEmail(auth, email)
+      .then(() => {
+        ToastAndroid.show('Password reset email sent. Check your inbox.', ToastAndroid.LONG);
+      })
+      .catch((error) => {
+        ToastAndroid.show(error.message || 'Error sending reset email.', ToastAndroid.LONG);
+      });
   }
 
   // const onSignInClick = async () => {
@@ -245,14 +249,14 @@ const SignIn = () => {
       </View>
       <View style={styles.footer}>
         <View ><TouchableOpacity disabled={loading} activeOpacity={0.8} style={styles.loginbutton} onPress={onSignInClick}>{!loading ? <Text style={styles.loginb}>Login</Text> :
-          <ActivityIndicator size={'large'} color={colors.cwhite} />
+          <ActivityIndicator size={'large'} color={'#666'} />
           // <Text>Loading..</Text>
         }</TouchableOpacity></View>
-        <View style={styles.ortextbox}><Text style={styles.ortext}>Or</Text></View>
-        <View ><TouchableOpacity activeOpacity={0.5} style={styles.congoogle}>
+        {/* <View style={styles.ortextbox}><Text style={styles.ortext}>Or</Text></View> */}
+        {/* <View ><TouchableOpacity activeOpacity={0.5} style={styles.congoogle}>
           <Ionicons name="logo-google" size={24} color="black" />
           <Text style={styles.cgoogletext} >Google</Text></TouchableOpacity>
-        </View>
+        </View> */}
 
       </View>
       <View style={styles.signupmainbox}><View style={styles.signupbox}><TouchableOpacity activeOpacity={0.5} onPress={onAgree}><Text style={styles.signuptext}>Don't have an account? <Text style={styles.signupminitext}>Create Now</Text></Text></TouchableOpacity>
@@ -389,7 +393,7 @@ const styles = StyleSheet.create({
 
 
   loginbutton: {
-    backgroundColor: colors.gblack,
+    backgroundColor: '#24a0ed',
     borderRadius: moderateScale(30),
     // height : moderateScale(45),
     width: moderateScale(250),

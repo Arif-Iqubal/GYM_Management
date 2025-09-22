@@ -53,15 +53,19 @@ import { router, useNavigation } from 'expo-router';
 import { EmailAuthProvider, reauthenticateWithCredential, sendEmailVerification, signOut, updateEmail, updatePassword } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Easing, Image, Modal, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Easing, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import placeholder from '../../assets/images/Avatar/man3.png';
 import { auth, db } from '../../config/firebaseconfig';
 import { useTheme } from '../../context/ThemeContext';
 import { uploadFileToCloudinary } from '../../services/imageService';
+// import { moderateScale } from '../../styles/responsiveStyles';
+import { moderateScale } from 'react-native-size-matters';
 
 
 
 export default function ProfileScreen() {
+  // Loader state for holiday marking
+  const [holidayLoading, setHolidayLoading] = React.useState(false);
   // ...existing code...
   // For email update modal
   // Email update modal state
@@ -409,7 +413,7 @@ export default function ProfileScreen() {
         <View style={styles.modalBackground}>
           <View style={styles.modalCard}>
             <TouchableOpacity onPress={() => setShowNewPasswordModal(false)} style={{ position: 'absolute', top: 10, right: 10, zIndex: 10 }}>
-              <Text style={{ fontSize: 16, color: 'grey' }}>✕</Text>
+              <Text style={{ fontSize: 16, color:isDarkMode? '#212211':'grey' }}>✕</Text>
             </TouchableOpacity>
             <Text style={[styles.modalTitle, { marginTop: 20 }]}>Enter New Password</Text>
             <TextInput
@@ -490,149 +494,220 @@ export default function ProfileScreen() {
 
   return (
     <Animated.View style={[styles.container, { backgroundColor: bgColor }]}> 
-      <Animated.Text style={[styles.header, { color: headerColor }]}>Profile</Animated.Text>
-
-      {/* Profile Image Section */}
-      <View style={{ alignItems: 'center', marginBottom: 20 }}>
-        <View style={{ position: 'relative' }}>
-          <Image
-            source={
-              image && typeof image === 'object' && image.uri
-                ? { uri: image.uri }
-                : typeof image === 'string'
-                ? { uri: image }
-                : placeholder
-            }
-            style={{ width: 120, height: 120, borderRadius: 60, borderWidth: 3, borderColor: '#fff', backgroundColor: '#e0f7fa' }}
-            resizeMode="cover"
-          />
-          <TouchableOpacity
-            onPress={() => setOpenModal(true)}
-            activeOpacity={0.7}
-            style={{ position: 'absolute', bottom: 0, right: 0, backgroundColor: '#fff', borderRadius: 15, padding: 6, borderWidth: 2, borderColor: '#e0e0e0' }}
-          >
-            <FontAwesome name="camera" size={18} color={isDarkMode ? '#181818' : '#181818'} />
-          </TouchableOpacity>
-        </View>
-        {loadingImage && <ActivityIndicator style={{ marginTop: 10 }} size="small" color="#2196F3" />}
-      </View>
-
-      {/* Image Picker Modal */}
-      <Modal visible={openModal} animationType="fade" transparent={true}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)' }}>
-          <View style={{ justifyContent: 'space-evenly', alignItems: 'center', height: 150, width: 300, backgroundColor: isDarkMode ? '#232323' : '#fff', borderRadius: 20 }} >
-            <View style={{ width: '100%', height: 80, flexDirection: 'row', justifyContent: 'space-evenly', alignItems: 'center' }}>
-              <TouchableOpacity activeOpacity={0.5} onPress={() => uploadImage()} style={{ backgroundColor: '#fff', width: 60, height: 60, justifyContent: 'center', alignItems: 'center', borderRadius: 15 }}>
-                <SimpleLineIcons name="camera" size={30} color="black" />
-                <Text style={{ fontSize: 10, fontWeight: '600' }}>Camera</Text>
-              </TouchableOpacity>
-              <TouchableOpacity activeOpacity={0.5} onPress={() => uploadImage('gallery')} style={{ backgroundColor: '#fff', width: 60, height: 60, justifyContent: 'center', alignItems: 'center', borderRadius: 15 }}>
-                <AntDesign name="picture" size={30} color="black" />
-                <Text style={{ fontSize: 10, fontWeight: '600' }}>Gallery</Text>
-              </TouchableOpacity>
-              <TouchableOpacity activeOpacity={0.5} onPress={removeImage} style={{ backgroundColor: '#fff', width: 60, height: 60, justifyContent: 'center', alignItems: 'center', borderRadius: 15 }}>
-                <AntDesign name="delete" size={30} color="black" />
-                <Text style={{ fontSize: 10, fontWeight: '600' }}>Remove</Text>
-              </TouchableOpacity>
-            </View>
-            <TouchableOpacity activeOpacity={0.5} onPress={() => setOpenModal(false)}>
-              <Text style={{ width: 80, textAlign: 'center', fontSize: 15, color: 'grey' }}>Cancel</Text>
+      <Animated.Text style={[styles.header, { color: headerColor, alignSelf: 'center' }]}>Profile</Animated.Text>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+        {/* Profile Card */}
+        <Animated.View style={[styles.profileCard, { backgroundColor: cardBg }]}> 
+          {/* Profile Image Section */}
+          <View style={styles.avatarContainer}>
+            <Image
+              source={
+                image && typeof image === 'object' && image.uri
+                  ? { uri: image.uri }
+                  : typeof image === 'string'
+                  ? { uri: image }
+                  : placeholder
+              }
+              style={[styles.avatar, { borderColor: isDarkMode ? '#232323' : '#fff', backgroundColor: isDarkMode ? '#232323' : '#e0f7fa' }]}
+              resizeMode="cover"
+            />
+            <TouchableOpacity
+              onPress={() => setOpenModal(true)}
+              activeOpacity={0.7}
+              style={[styles.avatarEditBtn, { backgroundColor: isDarkMode ? '#232323' : '#fff', borderColor: isDarkMode ? '#444' : '#e0e0e0' }]}
+            >
+              <FontAwesome name="camera" size={18} color={isDarkMode ? '#fff' : '#181818'} />
             </TouchableOpacity>
           </View>
-        </View>
-      </Modal>
+          {loadingImage && <ActivityIndicator style={{ marginTop: 10 }} size="small" color="#2196F3" />}
+          <Animated.Text style={[styles.profileName, { color: headerColor }]}>{adminDoc?.name || 'Admin'}</Animated.Text>
+        </Animated.View>
 
-      {/* Email Update */}
-      <Animated.View style={[styles.emailRow, { backgroundColor: emailRowBg }]}> 
-        <FontAwesome name="envelope" size={20} color={isDarkMode ? '#fff' : '#333'} />
-        <Animated.Text style={[styles.emailText, { color: emailTextColor }]}>{user?.email}</Animated.Text>
-        {/* Send verification icon and check verification if not verified */}
-        {!user?.emailVerified && (
-          <>
-            <TouchableOpacity
-              onPress={async () => {
-                try {
-                  await user.sendEmailVerification();
-                  Alert.alert('Verification Email Sent', 'Please check your inbox.');
-                } catch (e) {
-                  Alert.alert('Error', e.message || 'Failed to send verification email.');
-                }
-              }}
-              style={{ marginRight: 10 }}
-              accessibilityLabel="Send verification email"
-            >
-              <MaterialIcons name="mark-email-unread" size={22} color="#007AFF" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={async () => {
-                try {
-                  await user.reload();
-                  if (user.emailVerified) {
-                    Alert.alert('Success', 'Your email is now verified!');
-                  } else {
-                    Alert.alert('Not Verified', 'Your email is still not verified. Please check your inbox and click the verification link.');
+        {/* Image Picker Modal */}
+        <Modal visible={openModal} animationType="fade" transparent={true}>
+          <View style={styles.modalOverlay}>
+            <Animated.View style={[styles.modalPickerCard, { backgroundColor: cardBg }]}> 
+              <View style={styles.pickerRow}>
+                <TouchableOpacity activeOpacity={0.5} onPress={() => uploadImage()} style={[styles.pickerBtn, { backgroundColor: isDarkMode ? '#232323' : '#fff' }] }>
+                  <SimpleLineIcons name="camera" size={30} color={isDarkMode ? '#fff' : 'black'} />
+                  <Text style={[styles.pickerBtnText, { color: isDarkMode ? '#fff' : '#181818' }]}>Camera</Text>
+                </TouchableOpacity>
+                <TouchableOpacity activeOpacity={0.5} onPress={() => uploadImage('gallery')} style={[styles.pickerBtn, { backgroundColor: isDarkMode ? '#232323' : '#fff' }] }>
+                  <AntDesign name="picture" size={30} color={isDarkMode ? '#fff' : 'black'} />
+                  <Text style={[styles.pickerBtnText, { color: isDarkMode ? '#fff' : '#181818' }]}>Gallery</Text>
+                </TouchableOpacity>
+                <TouchableOpacity activeOpacity={0.5} onPress={removeImage} style={[styles.pickerBtn, { backgroundColor: isDarkMode ? '#232323' : '#fff' }] }>
+                  <AntDesign name="delete" size={30} color={isDarkMode ? '#fff' : 'black'} />
+                  <Text style={[styles.pickerBtnText, { color: isDarkMode ? '#fff' : '#181818' }]}>Remove</Text>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity activeOpacity={0.5} onPress={() => setOpenModal(false)}>
+                <Text style={[styles.pickerCancel, { color: isDarkMode ? '#bbb' : 'grey' }]}>Cancel</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          </View>
+        </Modal>
+
+        {/* Account Section */}
+        <Animated.Text style={[styles.sectionHeader, { color: labelColor }]}>Account</Animated.Text>
+        <Animated.View style={[styles.emailRow, { backgroundColor: emailRowBg }]}> 
+          <FontAwesome name="envelope" size={20} color={isDarkMode ? '#fff' : '#333'} />
+          <Animated.Text style={[styles.emailText, { color: emailTextColor }]}>{user?.email}</Animated.Text>
+          {!user?.emailVerified && (
+            <>
+              <TouchableOpacity
+                onPress={async () => {
+                  try {
+                    await user.sendEmailVerification();
+                    Alert.alert('Verification Email Sent', 'Please check your inbox.');
+                  } catch (e) {
+                    Alert.alert('Error', e.message || 'Failed to send verification email.');
                   }
-                } catch (e) {
-                  Alert.alert('Error', e.message || 'Failed to check verification.');
-                }
-              }}
-              style={{ marginRight: 10 }}
-              accessibilityLabel="Check verification"
+                }}
+                style={{ marginRight: 10 }}
+                accessibilityLabel="Send verification email"
+              >
+                <MaterialIcons name="mark-email-unread" size={22} color="#007AFF" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={async () => {
+                  try {
+                    await user.reload();
+                    if (user.emailVerified) {
+                      Alert.alert('Success', 'Your email is now verified!');
+                    } else {
+                      Alert.alert('Not Verified', 'Your email is still not verified. Please check your inbox and click the verification link.');
+                    }
+                  } catch (e) {
+                    Alert.alert('Error', e.message || 'Failed to check verification.');
+                  }
+                }}
+                style={{ marginRight: 10 }}
+                accessibilityLabel="Check verification"
+              >
+                <MaterialIcons name="refresh" size={22} color="#007AFF" />
+              </TouchableOpacity>
+            </>
+          )}
+        </Animated.View>
+
+        {/* Settings Section */}
+        <Animated.Text style={[styles.sectionHeader, { color: labelColor }]}>Settings</Animated.Text>
+        <Animated.View style={[styles.settingsGroup, { backgroundColor: cardBg }]}> 
+          <TouchableOpacity style={styles.option} onPress={handleStartPasswordChange}>
+            <Feather name="lock" size={24} color={isDarkMode ? '#fff' : '#555'} />
+            <Animated.Text style={[styles.optionText, { color: optionTextColor }]}>Change Password</Animated.Text>
+          </TouchableOpacity>
+          <View style={styles.divider} />
+          <TouchableOpacity
+            style={styles.option}
+            onPress={() => router.push('../addplans')}>
+            {/* <FontAwesome name="cogs" size={24} color={isDarkMode ? '#fff' : '#555'} /> */}
+            <Ionicons name="settings" size={24} color={isDarkMode ? '#fff' : '#555'} />
+            <Animated.Text style={[styles.optionText, { color: optionTextColor }]}>Plan Configuration</Animated.Text>
+          </TouchableOpacity>
+          <View style={styles.divider} />
+          <TouchableOpacity
+            style={[styles.option, {  borderRadius: 8, marginVertical: 8, opacity: holidayLoading ? 0.7 : 1 }]}
+            disabled={holidayLoading}
+            onPress={async () => {
+              Alert.alert(
+                'Mark Holiday',
+                'Are you sure you want to mark today as a holiday for all members? This cannot be undone.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Yes',
+                    style: 'destructive',
+                    onPress: async () => {
+                      setHolidayLoading(true);
+                      try {
+                        const adminId = auth.currentUser?.uid;
+                        if (!adminId) throw new Error('No admin user');
+                        const membersColRef = require('firebase/firestore').collection(db, 'admin', adminId, 'members');
+                        const membersSnap = await require('firebase/firestore').getDocs(membersColRef);
+                        const today = new Date();
+                        const yyyy = today.getFullYear();
+                        const mm = String(today.getMonth() + 1).padStart(2, '0');
+                        const dd = String(today.getDate()).padStart(2, '0');
+                        const todayStr = `${yyyy}-${mm}-${dd}`;
+                        for (const memberDoc of membersSnap.docs) {
+                          const memberId = memberDoc.id;
+                          const attRef = require('firebase/firestore').doc(db, 'admin', adminId, 'members', memberId, 'attendance', todayStr);
+                          await setDoc(attRef, { status: 'holiday', markedAt: new Date() }, { merge: true });
+                        }
+                        setHolidayLoading(false);
+                        Alert.alert('Success', 'Marked holiday for all members today.');
+                      } catch (e) {
+                        setHolidayLoading(false);
+                        Alert.alert('Error', e.message || 'Failed to mark holiday.');
+                      }
+                    },
+                  },
+                ]
+              );
+            }}
+          >
+            <MaterialIcons name="holiday-village" size={24} color ={ isDarkMode ? '#fff' : '#555'} />
+            <Text style={[styles.optionText, { color: isDarkMode ? '#fff' : '#555' }]}>Mark Holiday for Today{holidayLoading ? ' (Loading...)' : ''}</Text>
+            {holidayLoading && <ActivityIndicator size="small" color="#333" style={{ marginLeft: 10 }} />}
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* Theme Toggle */}
+        <View style={styles.themeRow}>
+          <Animated.Text style={{ color: headerColor, fontSize: 16, marginRight: 8 }}>Dark Mode</Animated.Text>
+          <TouchableOpacity
+            style={[styles.themeToggle, isDarkMode ? styles.themeToggleActive : null]}
+            activeOpacity={0.8}
+            onPress={toggleTheme}
+          >
+            <Animated.View
+              style={[styles.themeToggleThumb, isDarkMode ? styles.themeToggleThumbActive : null]}
             >
-              <MaterialIcons name="refresh" size={22} color="#007AFF" />
-            </TouchableOpacity>
-          </>
-        )}
-        <TouchableOpacity onPress={handleStartEmailEdit}>
-          <Feather name="edit" size={20} color="#007AFF" />
-        </TouchableOpacity>
-      </Animated.View>
-
-      {/* Password Change */}
-      <TouchableOpacity style={styles.option} onPress={handleStartPasswordChange}>
-        <Feather name="lock" size={24} color={isDarkMode ? '#fff' : '#555'} />
-        <Animated.Text style={[styles.optionText, { color: optionTextColor }]}>Change Password</Animated.Text>
-      </TouchableOpacity>
-
-      {/* Plan Configuration */}
-      <TouchableOpacity
-        style={styles.option}
-        onPress={() => router.push('../addplans')}>
-        <FontAwesome name="cogs" size={24} color={isDarkMode ? '#fff' : '#555'} />
-        <Animated.Text style={[styles.optionText, { color: optionTextColor }]}>Plan Configuration</Animated.Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={styles.option}
-        onPress={() => router.push('../charts')}>
-        <FontAwesome name="cogs" size={24} color={isDarkMode ? '#fff' : '#555'} />
-        <Animated.Text style={[styles.optionText, { color: optionTextColor }]}>Charts</Animated.Text>
-      </TouchableOpacity>
-
-      {/* Notifications */}
-      <TouchableOpacity style={styles.option}>
-        <Ionicons name="notifications-outline" size={24} color={isDarkMode ? '#fff' : '#555'} />
-        <Animated.Text style={[styles.optionText, { color: optionTextColor }]}>Notifications</Animated.Text>
-      </TouchableOpacity>
-
-      {/* Theme Toggle */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-        <Animated.Text style={{ color: headerColor, fontSize: 16, marginRight: 8 }}>Dark Mode</Animated.Text>
-        <Switch value={isDarkMode} onValueChange={toggleTheme} />
-      </View>
-
-      {/* Logout */}
-      <TouchableOpacity style={[styles.option, { marginTop: 20 }]} onPress={handleLogout}>
-        <MaterialIcons name="logout" size={24} color="red" />
-        <Animated.Text style={[styles.optionText, { color: 'red' }]}>Logout</Animated.Text>
-      </TouchableOpacity>
-      {renderModel()}
-      {renderModel1()}
-      {renderPasswordVerifyModal()}
-      {renderNewPasswordModal()}
+              {isDarkMode ? (
+                <Ionicons name="moon" size={18} color="#fff" />
+              ) : (
+                <Ionicons name="sunny" size={18} color="#FFD600" />
+              )}
+            </Animated.View>
+          </TouchableOpacity>
+        </View>
+  
+        {/* Logout */}
+        <Animated.View style={[styles.logoutBtn, { backgroundColor: isDarkMode ? '#2d1818' : '#fff0f0' }]}> 
+          <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center' }} onPress={handleLogout}>
+            <MaterialIcons name="logout" size={24} color="red" />
+            <Animated.Text style={[styles.optionText, { color: 'red' }]}>Logout</Animated.Text>
+          </TouchableOpacity>
+        </Animated.View>
+        <View style={{height:moderateScale(120)}}></View>
+        {renderModel()}
+        {renderModel1()}
+        {renderPasswordVerifyModal()}
+        {renderNewPasswordModal()}
+      </ScrollView>
     </Animated.View>
   );
 }
 const styles = StyleSheet.create({
+  settingsGroup: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    marginBottom: 18,
+    paddingVertical: 2,
+    // shadow for iOS/Android
+    shadowColor: '#000',
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#e0e0e0',
+    marginHorizontal: 8,
+    marginVertical: 0,
+  },
   container: {
     flex: 1,
     padding: 20,
@@ -643,38 +718,71 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 20,
   },
-  card: {
-    marginBottom: 15,
+  profileCard: {
+    alignItems: 'center',
     backgroundColor: '#f9f9f9',
-    padding: 15,
-    borderRadius: 10,
+    borderRadius: 18,
+    paddingVertical: 24,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  label: {
-    fontSize: 16,
-    color: '#444',
-    marginBottom: 5,
-  },
-  input: {
-    backgroundColor: '#eee',
-    padding: 10,
-    borderRadius: 8,
+  avatarContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 10,
   },
-  btn: {
-    backgroundColor: '#2196F3',
-    padding: 10,
-    borderRadius: 8,
-    alignItems: 'center',
+  avatar: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 3,
+    borderColor: '#fff',
+    backgroundColor: '#e0f7fa',
+    shadowColor: '#000',
+    shadowOpacity: 0.10,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  btnText: {
-    color: '#fff',
+  avatarEditBtn: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    backgroundColor: '#fff',
+    borderRadius: 15,
+    padding: 6,
+    borderWidth: 2,
+    borderColor: '#e0e0e0',
+    shadowColor: '#000',
+    shadowOpacity: 0.10,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  profileName: {
+    fontSize: 20,
     fontWeight: 'bold',
+    marginTop: 10,
+    marginBottom: 2,
+    alignSelf: 'center',
+  },
+  sectionHeader: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#888',
+    marginTop: 10,
+    marginBottom: 4,
+    letterSpacing: 1,
   },
   option: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginVertical: 12,
+    marginVertical: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 10,
   },
   optionText: {
     fontSize: 16,
@@ -695,6 +803,72 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
   },
+  themeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    marginBottom: 16,
+    marginTop: 8,
+  },
+  themeToggle: {
+    width: 54,
+    height: 28,
+    borderRadius: 16,
+    backgroundColor: '#e0e0e0',
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 3,
+    justifyContent: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#ccc',
+  },
+  themeToggleActive: {
+    backgroundColor: '#232323',
+    borderColor: '#444',
+    justifyContent: 'flex-end',
+  },
+  themeToggleThumb: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.10,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  themeToggleThumbActive: {
+    backgroundColor: '#181818',
+  },
+  logoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 30,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    backgroundColor: '#fff0f0',
+    alignSelf: 'center',
+  },
+  input: {
+    backgroundColor: '#eee',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  btn: {
+    backgroundColor: '#2196F3',
+    padding: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  btnText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
   modalBackground: {
     flex: 1,
     justifyContent: 'center',
@@ -712,4 +886,84 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
+  themeToggle: {
+    width: 54,
+    height: 28,
+    borderRadius: 16,
+    backgroundColor: '#e0e0e0',
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 3,
+    justifyContent: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#ccc',
+  },
+  themeToggleActive: {
+    backgroundColor: '#232323',
+    borderColor: '#444',
+    justifyContent: 'flex-end',
+  },
+  themeToggleThumb: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.10,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  themeToggleThumbActive: {
+    backgroundColor: '#181818',
+  },
+
+  // Modal for image picker
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.2)',
+  },
+  modalPickerCard: {
+    justifyContent: 'space-evenly',
+    alignItems: 'center',
+    height: 170,
+    width: 320,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 10,
+  },
+  pickerRow: {
+    width: '100%',
+    height: 80,
+    flexDirection: 'row',
+    justifyContent: 'space-evenly',
+    alignItems: 'center',
+  },
+  pickerBtn: {
+    backgroundColor: '#fff',
+    width: 60,
+    height: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 15,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  pickerBtnText: {
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  pickerCancel: {
+    width: 80,
+    textAlign: 'center',
+    fontSize: 15,
+    color: 'grey',
+    marginTop: 8,
+  },
 });
