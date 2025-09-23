@@ -203,10 +203,18 @@ export default function ScanQRScreen({ onScan }) {
       const attendanceRef = doc(db, 'admin', adminId, 'members', memberDocId, 'attendance', dateStr);
       const todayAttendanceSnap = await getDoc(attendanceRef);
       if (todayAttendanceSnap.exists()) {
-        Alert.alert('Already Marked', 'Attendance for today is already marked. Streak will not increase again.');
-        setAttendanceLoading(false);
-        return;
-      }
+       const data = todayAttendanceSnap.data();
+
+    // ✅ Check specifically if status is "present"
+    if (data?.status === 'present') {
+      Alert.alert(
+        'Already Marked',
+        'Attendance for today is already marked as present. Streak will not increase again.'
+      );
+      setAttendanceLoading(false);
+      return;
+    }
+      }
 
       // 2️⃣ Check previous day's attendance for streak logic
       const prevAttendanceRef = doc(db, 'admin', adminId, 'members', memberDocId, 'attendance', prevDateStr);
